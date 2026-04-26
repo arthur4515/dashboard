@@ -6,7 +6,7 @@ import { formatarMoeda, formatarPercentual, mesAtualISO } from '../utils/formata
 import { MetricCard } from '../components/MetricCard';
 import { Section } from '../components/Section';
 import { EmptyState } from '../components/EmptyState';
-import { insightsFinanceiros } from '../utils/automacoes';
+import { insightsFinanceiros, recorrenciasFuturas } from '../utils/automacoes';
 import { ChartFrame } from '../components/ChartFrame';
 
 export function Dashboard({ estado }: { estado: AppState }) {
@@ -16,6 +16,7 @@ export function Dashboard({ estado }: { estado: AppState }) {
   const categorias = gastosPorCategoria(estado, mes);
   const insights = insightsFinanceiros(estado, mes);
   const ultimas = [...estado.transacoes].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 6);
+  const futuras = recorrenciasFuturas(estado, 30).slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -91,6 +92,20 @@ export function Dashboard({ estado }: { estado: AppState }) {
           )}
         </Section>
       </div>
+
+      <Section titulo="Proximos lancamentos recorrentes">
+        {futuras.length === 0 ? <EmptyState icon={Wallet} titulo="Sem recorrencias futuras" texto="Cadastre recorrencias para visualizar previsoes dos proximos dias." /> : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {futuras.map((item) => (
+              <div key={`${item.recorrente.id}-${item.data}`} className="rounded-lg border border-violet-100 p-3 dark:border-violet-950">
+                <p className="text-sm text-slate-500">{new Date(item.data).toLocaleDateString('pt-BR')}</p>
+                <strong className="mt-1 block text-slate-950 dark:text-white">{item.recorrente.descricao}</strong>
+                <span className={item.recorrente.tipo === 'receita' ? 'text-sm font-bold text-emerald-600' : 'text-sm font-bold text-rose-600'}>{formatarMoeda(item.recorrente.valor)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }

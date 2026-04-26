@@ -16,9 +16,9 @@ const SELECTS = {
   categories: 'id, user_id, name, type, color, created_at',
   transactions: 'id, user_id, type, category_id, description, amount, date, recurrence_id, imported, created_at',
   budgets: 'id, user_id, category_id, limit_amount, created_at',
-  investments: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, created_at',
+  investments: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, details, created_at',
   goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
-  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
+  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, created_at',
 } as const;
 
 function iniciais(nome: string) {
@@ -101,9 +101,9 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     },
     categorias: (categories.data ?? []).map((item) => ({ id: item.id, nome: item.name, tipo: item.type, cor: item.color })) as Categoria[],
     transacoes: (transactions.data ?? []).map((item) => ({ id: item.id, tipo: item.type, categoriaId: item.category_id ?? '', descricao: item.description, valor: Number(item.amount), data: item.date, recorrenciaId: item.recurrence_id ?? undefined, importada: item.imported })) as Transacao[],
-    recorrentes: (recurring.data ?? []).map((item) => ({ id: item.id, tipo: item.type, categoriaId: item.category_id ?? '', descricao: item.description, valor: Number(item.amount), dataInicio: item.start_date, frequencia: item.frequency, ativa: item.active })) as TransacaoRecorrente[],
+    recorrentes: (recurring.data ?? []).map((item) => ({ id: item.id, tipo: item.type, tipoRecorrencia: item.kind ?? item.type, categoriaId: item.category_id ?? '', descricao: item.description, valor: Number(item.amount), dataInicio: item.start_date, dataFinal: item.end_date ?? undefined, proximaData: item.next_date ?? undefined, frequencia: item.frequency, status: item.status ?? (item.active ? 'ativa' : 'pausada'), ativa: item.active })) as TransacaoRecorrente[],
     orcamentos: (budgets.data ?? []).map((item) => ({ id: item.id, categoriaId: item.category_id, limite: Number(item.limit_amount) })) as Orcamento[],
-    investimentos: (investments.data ?? []).map((item) => ({ id: item.id, nome: item.name, tipo: item.type, valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return) })) as Investimento[],
+    investimentos: (investments.data ?? []).map((item) => ({ id: item.id, nome: item.name, tipo: item.type, valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return), detalhes: item.details ?? {} })) as Investimento[],
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
     historicoMensal: [],
   };
@@ -128,9 +128,9 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   await Promise.all([
     inserirLinhas('transactions', estado.transacoes.map((item) => ({ id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, date: item.data, recurrence_id: item.recorrenciaId ?? null, imported: item.importada ?? false }))),
     inserirLinhas('budgets', estado.orcamentos.map((item) => ({ id: item.id, user_id: userId, category_id: item.categoriaId, limit_amount: item.limite }))),
-    inserirLinhas('investments', estado.investimentos.map((item) => ({ id: item.id, user_id: userId, name: item.nome, type: item.tipo, initial_amount: item.valorInicial, monthly_contribution: item.aporteMensal, expected_return: item.rentabilidadeEsperada, current_return: item.rentabilidadeAtual }))),
+    inserirLinhas('investments', estado.investimentos.map((item) => ({ id: item.id, user_id: userId, name: item.nome, type: item.tipo, initial_amount: item.valorInicial, monthly_contribution: item.aporteMensal, expected_return: item.rentabilidadeEsperada, current_return: item.rentabilidadeAtual, details: item.detalhes ?? {} }))),
     inserirLinhas('goals', estado.metas.map((item) => ({ id: item.id, user_id: userId, name: item.nome, target_amount: item.valorAlvo, current_amount: item.valorAtual, deadline: item.prazo }))),
-    inserirLinhas('recurring_transactions', estado.recorrentes.map((item) => ({ id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, start_date: item.dataInicio, frequency: item.frequencia, active: item.ativa }))),
+    inserirLinhas('recurring_transactions', estado.recorrentes.map((item) => ({ id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, start_date: item.dataInicio, frequency: item.frequencia, active: item.status ? item.status === 'ativa' : item.ativa, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio }))),
   ]);
 }
 

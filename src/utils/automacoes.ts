@@ -32,7 +32,7 @@ export function sugerirCategoria(descricao: string, categorias: Categoria[], tip
 
 export function gerarRecorrenciasDoMes(estado: AppState, mesIso: string) {
   const novas: Transacao[] = [];
-  estado.recorrentes.filter((item) => item.ativa).forEach((recorrente) => {
+  estado.recorrentes.filter(recorrenciaAtiva).forEach((recorrente) => {
     datasDaRecorrencia(recorrente, mesIso).forEach((data) => {
       const existe = estado.transacoes.some((transacao) => transacao.recorrenciaId === recorrente.id && transacao.data === data);
       if (!existe) {
@@ -49,6 +49,48 @@ export function gerarRecorrenciasDoMes(estado: AppState, mesIso: string) {
     });
   });
   return novas;
+}
+
+export function gerarLancamentosRecorrentesAte(estado: AppState, dias: number) {
+  const hoje = new Date();
+  const fim = new Date();
+  fim.setDate(fim.getDate() + dias);
+  const novas: Transacao[] = [];
+  estado.recorrentes.filter(recorrenciaAtiva).forEach((recorrente) => {
+    datasEntre(recorrente, hoje, fim).forEach((data) => {
+      const existe = estado.transacoes.some((transacao) => transacao.recorrenciaId === recorrente.id && transacao.data === data);
+      if (!existe) {
+        novas.push({
+          id: uid('auto'),
+          tipo: recorrente.tipo,
+          categoriaId: recorrente.categoriaId,
+          descricao: recorrente.descricao,
+          valor: recorrente.valor,
+          data,
+          recorrenciaId: recorrente.id,
+        });
+      }
+    });
+  });
+  return novas;
+}
+
+export function recorrenciasFuturas(estado: AppState, dias = 90) {
+  const hoje = new Date();
+  const fim = new Date();
+  fim.setDate(fim.getDate() + dias);
+  return estado.recorrentes
+    .filter(recorrenciaAtiva)
+    .flatMap((recorrente) => datasEntre(recorrente, hoje, fim).map((data) => ({ recorrente, data })))
+    .sort((a, b) => a.data.localeCompare(b.data));
+}
+
+export function previsaoRecorrente(estado: AppState, dias: number) {
+  return recorrenciasFuturas(estado, dias).reduce((total, item) => total + (item.recorrente.tipo === 'receita' ? item.recorrente.valor : -item.recorrente.valor), 0);
+}
+
+export function proximaDataRecorrencia(recorrente: TransacaoRecorrente, referencia = new Date()) {
+  return datasEntre(recorrente, referencia, addDias(referencia, 370))[0];
 }
 
 export function sugerirOrcamentos(estado: AppState) {
@@ -146,20 +188,41 @@ function datasDaRecorrencia(recorrente: TransacaoRecorrente, mesIso: string) {
   const inicioMes = new Date(ano, mes - 1, 1);
   const fimMes = new Date(ano, mes, 0);
   if (inicio > fimMes) return [];
+  return datasEntre(recorrente, inicioMes, fimMes);
+}
+
+function avancar(data: Date, frequencia: FrequenciaRecorrencia) {
+  if (frequencia === 'semanal') data.setDate(data.getDate() + 7);
+  if (frequencia === 'quinzenal') data.setDate(data.getDate() + 15);
+  if (frequencia === 'mensal') data.setMonth(data.getMonth() + 1);
+  if (frequencia === 'bimestral') data.setMonth(data.getMonth() + 2);
+  if (frequencia === 'trimestral') data.setMonth(data.getMonth() + 3);
+  if (frequencia === 'semestral') data.setMonth(data.getMonth() + 6);
+  if (frequencia === 'anual') data.setFullYear(data.getFullYear() + 1);
+}
+
+function datasEntre(recorrente: TransacaoRecorrente, inicioJanela: Date, fimJanela: Date) {
+  const inicio = new Date(`${recorrente.dataInicio}T00:00:00`);
+  const fimRecorrencia = recorrente.dataFinal ? new Date(`${recorrente.dataFinal}T23:59:59`) : null;
+  if (inicio > fimJanela || (fimRecorrencia && fimRecorrencia < inicioJanela)) return [];
   const datas: string[] = [];
   const cursor = new Date(inicio);
-  while (cursor < inicioMes) avancar(cursor, recorrente.frequencia);
-  while (cursor <= fimMes) {
+  while (cursor < inicioJanela) avancar(cursor, recorrente.frequencia);
+  while (cursor <= fimJanela && (!fimRecorrencia || cursor <= fimRecorrencia)) {
     datas.push(cursor.toISOString().slice(0, 10));
     avancar(cursor, recorrente.frequencia);
   }
   return datas;
 }
 
-function avancar(data: Date, frequencia: FrequenciaRecorrencia) {
-  if (frequencia === 'semanal') data.setDate(data.getDate() + 7);
-  if (frequencia === 'mensal') data.setMonth(data.getMonth() + 1);
-  if (frequencia === 'anual') data.setFullYear(data.getFullYear() + 1);
+function recorrenciaAtiva(recorrente: TransacaoRecorrente) {
+  return (recorrente.status ?? (recorrente.ativa ? 'ativa' : 'pausada')) === 'ativa';
+}
+
+function addDias(data: Date, dias: number) {
+  const nova = new Date(data);
+  nova.setDate(nova.getDate() + dias);
+  return nova;
 }
 
 function ultimosMesesComDados(transacoes: Transacao[], limite: number) {

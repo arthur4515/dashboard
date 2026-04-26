@@ -18,16 +18,22 @@ export type Transacao = {
   importada?: boolean;
 };
 
-export type FrequenciaRecorrencia = 'semanal' | 'mensal' | 'anual';
+export type FrequenciaRecorrencia = 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
+export type StatusRecorrencia = 'ativa' | 'pausada' | 'encerrada';
+export type TipoRecorrencia = 'receita' | 'despesa' | 'aporte';
 
 export type TransacaoRecorrente = {
   id: string;
   tipo: TipoTransacao;
+  tipoRecorrencia?: TipoRecorrencia;
   categoriaId: string;
   descricao: string;
   valor: number;
   dataInicio: string;
+  dataFinal?: string;
+  proximaData?: string;
   frequencia: FrequenciaRecorrencia;
+  status?: StatusRecorrencia;
   ativa: boolean;
 };
 
@@ -37,7 +43,21 @@ export type Orcamento = {
   limite: number;
 };
 
-export type TipoInvestimento = 'Renda fixa' | 'Acoes' | 'Fundos' | 'Cripto' | 'Reserva de emergencia' | 'Outros';
+export type TipoInvestimento = 'CDB' | 'Tesouro Direto' | 'LCI/LCA' | 'FII' | 'Acao' | 'ETF' | 'Cripto' | 'Reserva de emergencia' | 'Outro' | 'Renda fixa' | 'Acoes' | 'Fundos' | 'Outros';
+
+export type DetalhesInvestimento = {
+  emissor?: string;
+  percentualCdi?: number;
+  vencimento?: string;
+  liquidez?: 'diaria' | 'vencimento';
+  ticker?: string;
+  quantidade?: number;
+  precoMedio?: number;
+  precoAtual?: number;
+  dividendosMensais?: number;
+  dividendYield?: number;
+  moeda?: string;
+};
 
 export type Investimento = {
   id: string;
@@ -47,6 +67,7 @@ export type Investimento = {
   aporteMensal: number;
   rentabilidadeEsperada: number;
   rentabilidadeAtual: number;
+  detalhes?: DetalhesInvestimento;
 };
 
 export type MetaFinanceira = {

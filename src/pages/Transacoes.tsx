@@ -1,11 +1,11 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 import { CalendarClock, Edit3, FileUp, Plus, Search, Trash2 } from 'lucide-react';
-import { AppState, FrequenciaRecorrencia, TipoTransacao, Transacao, TransacaoRecorrente } from '../types/financeiro';
+import { AppState, FrequenciaRecorrencia, StatusRecorrencia, TipoRecorrencia, TipoTransacao, Transacao, TransacaoRecorrente } from '../types/financeiro';
 import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
 import { formatarMoeda, mesAtualISO } from '../utils/formatadores';
 import { uid } from '../utils/calculos';
-import { detectarDuplicata, gerarRecorrenciasDoMes, ImportacaoCSV, importarCSV, sugerirCategoria } from '../utils/automacoes';
+import { detectarDuplicata, gerarLancamentosRecorrentesAte, gerarRecorrenciasDoMes, ImportacaoCSV, importarCSV, previsaoRecorrente, proximaDataRecorrencia, recorrenciasFuturas, sugerirCategoria } from '../utils/automacoes';
 
 type Props = {
   estado: AppState;
@@ -25,6 +25,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
   const [categoria, setCategoria] = useState('todas');
   const [mes, setMes] = useState(mesAtualISO());
   const [busca, setBusca] = useState('');
+  const futuras = recorrenciasFuturas(estado, 90).slice(0, 12);
 
   const categoriasDoTipo = estado.categorias.filter((item) => item.tipo === form.tipo);
   const filtradas = useMemo(() => estado.transacoes.filter((item) => {
@@ -80,7 +81,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
       avisar('Preencha a recorrencia corretamente.', 'erro');
       return;
     }
-    const nova = { ...recorrenteForm, id: uid('rec') };
+    const nova = { ...recorrenteForm, proximaData: proximaDataRecorrencia(recorrenteForm as TransacaoRecorrente), id: uid('rec') };
     setEstado((atual) => atual && ({ ...atual, recorrentes: [...atual.recorrentes, nova] }));
     avisar('Recorrencia criada.');
     setModalRecorrencia(false);
@@ -91,6 +92,13 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
     if (novas.length === 0) return avisar('Nenhum lancamento novo para gerar.', 'info');
     setEstado((atual) => atual && ({ ...atual, transacoes: [...novas, ...atual.transacoes] }));
     avisar(`${novas.length} lancamento(s) recorrente(s) gerado(s).`);
+  }
+
+  function gerarProximosDias(dias: number) {
+    const novas = gerarLancamentosRecorrentesAte(estado, dias);
+    if (novas.length === 0) return avisar('Nenhum lancamento futuro novo para gerar.', 'info');
+    setEstado((atual) => atual && ({ ...atual, transacoes: [...novas, ...atual.transacoes] }));
+    avisar(`${novas.length} lancamento(s) gerado(s) para os proximos ${dias} dias.`);
   }
 
   function lerCSV(event: ChangeEvent<HTMLInputElement>) {
@@ -132,8 +140,37 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={gerarRecorrencias}>Gerar recorrentes do mes</button>
-          <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{estado.recorrentes.filter((item) => item.ativa).length} recorrencia(s) ativa(s)</span>
+          <button className="btn-secondary" onClick={() => gerarProximosDias(30)}>Gerar proximos 30 dias</button>
+          <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{estado.recorrentes.filter((item) => (item.status ?? (item.ativa ? 'ativa' : 'pausada')) === 'ativa').length} recorrencia(s) ativa(s)</span>
         </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {[30, 60, 90].map((dias) => (
+          <div key={dias} className="card p-4">
+            <p className="text-sm text-slate-500">Previsao {dias} dias</p>
+            <strong className="mt-1 block text-xl text-violet-950 dark:text-white">{formatarMoeda(previsaoRecorrente(estado, dias))}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="card p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-slate-950 dark:text-white">Recorrencias futuras</h2>
+          <button className="btn-secondary" onClick={() => gerarProximosDias(90)}>Gerar proximos 90 dias</button>
+        </div>
+        {futuras.length === 0 ? <EmptyState icon={CalendarClock} titulo="Sem recorrencias futuras" texto="Cadastre uma recorrencia ativa para ver proximas cobrancas, recebimentos e aportes." /> : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {futuras.map((item) => (
+              <div key={`${item.recorrente.id}-${item.data}`} className="rounded-lg border border-violet-100 p-3 dark:border-violet-950">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="font-semibold text-slate-950 dark:text-white">{item.recorrente.descricao}</p><p className="text-sm text-slate-500">{item.recorrente.tipoRecorrencia ?? item.recorrente.tipo} - {new Date(item.data).toLocaleDateString('pt-BR')}</p></div>
+                  <strong className={item.recorrente.tipo === 'receita' ? 'text-emerald-600' : 'text-rose-600'}>{formatarMoeda(item.recorrente.valor)}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card overflow-hidden">
@@ -175,15 +212,18 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
 
       <Modal aberto={modalRecorrencia} titulo="Nova transacao recorrente" onFechar={() => setModalRecorrencia(false)}>
         <form className="grid gap-4 md:grid-cols-2" onSubmit={salvarRecorrencia}>
-          <select className="input" value={recorrenteForm.tipo} onChange={(e) => {
-            const novoTipo = e.target.value as TipoTransacao;
-            setRecorrenteForm({ ...recorrenteForm, tipo: novoTipo, categoriaId: sugerirCategoria(recorrenteForm.descricao, estado.categorias, novoTipo) });
-          }}><option value="receita">Receita</option><option value="despesa">Despesa</option></select>
-          <select className="input" value={recorrenteForm.frequencia} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, frequencia: e.target.value as FrequenciaRecorrencia })}><option value="semanal">Semanal</option><option value="mensal">Mensal</option><option value="anual">Anual</option></select>
+          <select className="input" value={recorrenteForm.tipoRecorrencia ?? recorrenteForm.tipo} onChange={(e) => {
+            const tipoRecorrencia = e.target.value as TipoRecorrencia;
+            const novoTipo: TipoTransacao = tipoRecorrencia === 'receita' ? 'receita' : 'despesa';
+            setRecorrenteForm({ ...recorrenteForm, tipoRecorrencia, tipo: novoTipo, categoriaId: sugerirCategoria(recorrenteForm.descricao, estado.categorias, novoTipo) });
+          }}><option value="receita">Receita recorrente</option><option value="despesa">Despesa recorrente</option><option value="aporte">Aporte recorrente</option></select>
+          <select className="input" value={recorrenteForm.frequencia} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, frequencia: e.target.value as FrequenciaRecorrencia })}><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option><option value="bimestral">Bimestral</option><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select>
           <input className="input md:col-span-2" placeholder="Ex: aluguel, salario, internet" value={recorrenteForm.descricao} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, descricao: e.target.value, categoriaId: sugerirCategoria(e.target.value, estado.categorias, recorrenteForm.tipo) })} />
           <select className="input" value={recorrenteForm.categoriaId} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, categoriaId: e.target.value })}>{estado.categorias.filter((item) => item.tipo === recorrenteForm.tipo).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select>
           <input className="input" type="number" min="0" step="0.01" value={recorrenteForm.valor} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, valor: Number(e.target.value) })} />
-          <input className="input md:col-span-2" type="date" value={recorrenteForm.dataInicio} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, dataInicio: e.target.value })} />
+          <input className="input" type="date" value={recorrenteForm.dataInicio} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, dataInicio: e.target.value })} />
+          <input className="input" type="date" value={recorrenteForm.dataFinal ?? ''} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, dataFinal: e.target.value || undefined })} />
+          <select className="input md:col-span-2" value={recorrenteForm.status ?? 'ativa'} onChange={(e) => setRecorrenteForm({ ...recorrenteForm, status: e.target.value as StatusRecorrencia, ativa: e.target.value === 'ativa' })}><option value="ativa">Ativa</option><option value="pausada">Pausada</option><option value="encerrada">Encerrada</option></select>
           <div className="grid gap-3 md:col-span-2 md:grid-cols-2"><button className="btn-secondary" type="button" onClick={() => setModalRecorrencia(false)}>Cancelar</button><button className="btn-primary" type="submit">Salvar recorrencia</button></div>
         </form>
       </Modal>
@@ -206,5 +246,5 @@ function criarTransacaoVazia(estado: AppState, tipo: TipoTransacao): Omit<Transa
 }
 
 function criarRecorrenteVazio(estado: AppState): Omit<TransacaoRecorrente, 'id'> {
-  return { tipo: 'despesa', categoriaId: estado.categorias.find((categoria) => categoria.tipo === 'despesa')?.id ?? '', descricao: '', valor: 0, dataInicio: new Date().toISOString().slice(0, 10), frequencia: 'mensal', ativa: true };
+  return { tipo: 'despesa', tipoRecorrencia: 'despesa', categoriaId: estado.categorias.find((categoria) => categoria.tipo === 'despesa')?.id ?? '', descricao: '', valor: 0, dataInicio: new Date().toISOString().slice(0, 10), frequencia: 'mensal', status: 'ativa', ativa: true };
 }
