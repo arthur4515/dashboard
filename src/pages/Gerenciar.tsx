@@ -105,8 +105,8 @@ export function Gerenciar({ estado, setEstado, avisar, resetarExemplos }: Props)
         </div>
       </Section>
 
-      <Section titulo="Dados de exemplo">
-        <button className="btn-secondary" onClick={() => { resetarExemplos(); avisar('Dados de exemplo restaurados.'); }}><RotateCcw size={18} />Resetar dados de exemplo</button>
+      <Section titulo="Dados">
+        <button className="btn-secondary" onClick={() => { resetarExemplos(); avisar('Dados removidos.'); }}><RotateCcw size={18} />Limpar dados</button>
       </Section>
 
       <Modal aberto={modalCategoria} titulo={categoriaEditando ? 'Editar categoria' : 'Nova categoria'} onFechar={() => setModalCategoria(false)}>

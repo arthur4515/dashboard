@@ -1,5 +1,4 @@
 import { User } from '@supabase/supabase-js';
-import { criarDadosExemplo } from '../data/mockData';
 import { AppState, AuthUser, Categoria, Investimento, MetaFinanceira, Orcamento, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
 import { exigirSupabase } from './supabaseClient';
 
@@ -82,12 +81,6 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
   const erro = [profile.error, categories.error, transactions.error, budgets.error, investments.error, goals.error, recurring.error].find(Boolean);
   if (erro) throw new Error(erro.message);
 
-  if ((categories.data ?? []).length === 0) {
-    const exemplo = criarDadosExemploNuvem(usuario);
-    await salvarEstadoSupabase(usuario.id, exemplo);
-    return exemplo;
-  }
-
   const perfil = profile.data ?? {
     id: usuario.id,
     name: usuario.nome,
@@ -142,7 +135,7 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
 }
 
 export async function resetarDadosSupabase(usuario: AuthUser) {
-  const dados = criarDadosExemploNuvem(usuario);
+  const dados = criarEstadoVazio(usuario);
   await salvarEstadoSupabase(usuario.id, dados);
   return dados;
 }
@@ -186,41 +179,22 @@ export function authUserFromSupabase(user: User, nomeFallback?: string): AuthUse
   };
 }
 
-function criarDadosExemploNuvem(usuario: AuthUser): AppState {
-  const dados = criarDadosExemplo(usuario);
-  const prefixo = usuario.id;
-  const categoriaIds = new Map(dados.categorias.map((categoria) => [categoria.id, `${prefixo}-${categoria.id}`]));
-  const recorrenciaIds = new Map(dados.recorrentes.map((recorrente) => [recorrente.id, `${prefixo}-${recorrente.id}`]));
-
+function criarEstadoVazio(usuario: AuthUser): AppState {
   return {
-    ...dados,
-    categorias: dados.categorias.map((categoria) => ({
-      ...categoria,
-      id: categoriaIds.get(categoria.id) ?? `${prefixo}-${categoria.id}`,
-    })),
-    transacoes: dados.transacoes.map((transacao) => ({
-      ...transacao,
-      id: `${prefixo}-${transacao.id}`,
-      categoriaId: categoriaIds.get(transacao.categoriaId) ?? transacao.categoriaId,
-      recorrenciaId: transacao.recorrenciaId ? recorrenciaIds.get(transacao.recorrenciaId) : undefined,
-    })),
-    recorrentes: dados.recorrentes.map((recorrente) => ({
-      ...recorrente,
-      id: recorrenciaIds.get(recorrente.id) ?? `${prefixo}-${recorrente.id}`,
-      categoriaId: categoriaIds.get(recorrente.categoriaId) ?? recorrente.categoriaId,
-    })),
-    orcamentos: dados.orcamentos.map((orcamento) => ({
-      ...orcamento,
-      id: `${prefixo}-${orcamento.id}`,
-      categoriaId: categoriaIds.get(orcamento.categoriaId) ?? orcamento.categoriaId,
-    })),
-    investimentos: dados.investimentos.map((investimento) => ({
-      ...investimento,
-      id: `${prefixo}-${investimento.id}`,
-    })),
-    metas: dados.metas.map((meta) => ({
-      ...meta,
-      id: `${prefixo}-${meta.id}`,
-    })),
+    usuario: {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      avatar: usuario.avatar,
+      tema: usuario.tema,
+      metaEconomia: 25,
+    },
+    categorias: [],
+    transacoes: [],
+    recorrentes: [],
+    orcamentos: [],
+    investimentos: [],
+    metas: [],
+    historicoMensal: [],
   };
 }
