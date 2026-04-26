@@ -1,4 +1,5 @@
 export type TipoTransacao = 'receita' | 'despesa';
+export type StatusTransacao = 'realizado' | 'previsto';
 
 export type Categoria = {
   id: string;
@@ -16,6 +17,8 @@ export type Transacao = {
   data: string;
   recorrenciaId?: string;
   importada?: boolean;
+  recorrente?: boolean;
+  status?: StatusTransacao;
 };
 
 export type FrequenciaRecorrencia = 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
@@ -36,6 +39,16 @@ export type TransacaoRecorrente = {
   frequencia: FrequenciaRecorrencia;
   status?: StatusRecorrencia;
   ativa: boolean;
+  gerarAutomatico?: boolean;
+};
+
+export type SessaoTrabalho = {
+  id: string;
+  data: string;
+  horasTrabalhadas: number;
+  valorHora: number;
+  totalGanho: number;
+  transacaoId?: string;
 };
 
 export type Orcamento = {
@@ -118,6 +131,7 @@ export type AppState = {
   investimentos: Investimento[];
   metas: MetaFinanceira[];
   historicoMensal: HistoricoMensal[];
+  sessoesTrabalho: SessaoTrabalho[];
 };
 
 export type Toast = {

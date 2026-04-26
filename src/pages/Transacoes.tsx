@@ -140,9 +140,8 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
 
   function gerarRecorrencias() {
     const novas = gerarRecorrenciasDoMes(estado, mes);
-    if (novas.length === 0) return avisar('Nenhum lancamento novo para gerar.', 'info');
-    setEstado((atual) => atual && ({ ...atual, transacoes: [...novas, ...atual.transacoes] }));
-    avisar(`${novas.length} lancamento(s) recorrente(s) gerado(s).`);
+    if (novas.length === 0) return avisar('Nenhuma previsao recorrente nova para este mes.', 'info');
+    avisar(`${novas.length} previsao(oes) recorrente(s) disponivel(is) em lancamentos futuros.`, 'info');
   }
 
   function lerCSV(event: ChangeEvent<HTMLInputElement>) {
@@ -399,6 +398,7 @@ function simularExecucoes(recorrente: TransacaoRecorrente) {
     investimentos: [],
     metas: [],
     historicoMensal: [],
+    sessoesTrabalho: [],
   };
   return recorrenciasFuturas(estadoTemporario, 90)
     .slice(0, 8)

@@ -1,5 +1,5 @@
 import { FormEvent, ReactElement, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Calculator, ChartNoAxesCombined, DatabaseZap, LayoutDashboard, LogOut, ReceiptText, Target, UserCog, WalletCards } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, Calculator, ChartNoAxesCombined, DatabaseZap, LayoutDashboard, LogOut, ReceiptText, Target, UserCog, WalletCards } from 'lucide-react';
 import { Dashboard } from './pages/Dashboard';
 import { Transacoes } from './pages/Transacoes';
 import { Orcamentos } from './pages/Orcamentos';
@@ -9,6 +9,7 @@ import { Projecao } from './pages/Projecao';
 import { Relatorios } from './pages/Relatorios';
 import { AuthPage } from './pages/AuthPage';
 import { Gerenciar } from './pages/Gerenciar';
+import { RendaVariavel } from './pages/RendaVariavel';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ToastHost } from './components/ToastHost';
 import { LoadingState } from './components/LoadingState';
@@ -24,6 +25,7 @@ import { Usuario } from './types/financeiro';
 const telas = [
   { id: 'dashboard', nome: 'Dashboard', icon: LayoutDashboard },
   { id: 'transacoes', nome: 'Transacoes', icon: ReceiptText },
+  { id: 'renda', nome: 'Renda variavel', icon: BriefcaseBusiness },
   { id: 'orcamentos', nome: 'Orcamento', icon: Target },
   { id: 'investimentos', nome: 'Investimentos', icon: WalletCards },
   { id: 'simulador', nome: 'Simulador', icon: Calculator },
@@ -116,6 +118,7 @@ export default function App() {
   const conteudo = {
     dashboard: <Dashboard estado={estado} />,
     transacoes: <Transacoes estado={estado} setEstado={setEstado} avisar={mostrar} />,
+    renda: <RendaVariavel estado={estado} setEstado={setEstado} avisar={mostrar} />,
     orcamentos: <Orcamentos estado={estado} setEstado={setEstado} avisar={mostrar} />,
     investimentos: <Investimentos estado={estado} setEstado={setEstado} avisar={mostrar} />,
     simulador: <Simulador />,

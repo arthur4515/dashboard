@@ -20,12 +20,14 @@ export function Dashboard({ estado }: { estado: AppState }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard titulo="Saldo atual" valor={formatarMoeda(resumo.saldoAtual)} variacao="Calculado com todas as transacoes" icon={Wallet} tom="azul" />
-        <MetricCard titulo="Receita mensal" valor={formatarMoeda(resumo.receita)} variacao="Atualiza ao adicionar receitas" icon={ArrowUpRight} tom="verde" />
-        <MetricCard titulo="Despesas mensais" valor={formatarMoeda(resumo.despesa)} variacao="Atualiza ao adicionar despesas" icon={ArrowDownRight} tom="vermelho" />
-        <MetricCard titulo="Economia do mes" valor={formatarMoeda(resumo.economia)} variacao="Receitas menos despesas do mes" icon={PiggyBank} tom="ambar" />
-        <MetricCard titulo="Patrimonio total" valor={formatarMoeda(resumo.patrimonioTotal)} variacao="Saldo, metas e investimentos" icon={Landmark} tom="azul" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard titulo="Saldo atual" valor={formatarMoeda(resumo.saldoAtual)} variacao="Somente transacoes realizadas" icon={Wallet} tom="azul" />
+        <MetricCard titulo="Receita real do mes" valor={formatarMoeda(resumo.receita)} variacao={`Renda variavel: ${formatarMoeda(resumo.rendaVariavelMes)}`} icon={ArrowUpRight} tom="verde" />
+        <MetricCard titulo="Despesa real do mes" valor={formatarMoeda(resumo.despesa)} variacao="Somente despesas realizadas" icon={ArrowDownRight} tom="vermelho" />
+        <MetricCard titulo="Economia real" valor={formatarMoeda(resumo.economia)} variacao="Receita real menos despesa real" icon={PiggyBank} tom="ambar" />
+        <MetricCard titulo="Saldo previsto" valor={formatarMoeda(resumo.saldoPrevisto)} variacao="Saldo atual + previsoes do mes" icon={Landmark} tom="azul" />
+        <MetricCard titulo="Receita prevista" valor={formatarMoeda(resumo.receitaPrevista)} variacao="Previstos e recorrencias futuras" icon={TrendingUp} tom="verde" />
+        <MetricCard titulo="Despesa prevista" valor={formatarMoeda(resumo.despesaPrevista)} variacao="Previstos e recorrencias futuras" icon={AlertTriangle} tom="vermelho" />
         <MetricCard titulo="Taxa de economia" valor={formatarPercentual(resumo.taxaEconomia)} variacao={`Meta: ${estado.usuario.metaEconomia}%`} icon={TrendingUp} />
       </div>
 

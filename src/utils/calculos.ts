@@ -1,4 +1,5 @@
 import { AppState, HistoricoMensal, Investimento, Transacao } from '../types/financeiro';
+import { recorrenciasFuturas } from './automacoes';
 
 export function uid(prefixo = 'id') {
   return `${prefixo}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
@@ -8,6 +9,14 @@ export function filtrarPorMes(transacoes: Transacao[], mesIso: string) {
   return transacoes.filter((transacao) => transacao.data.startsWith(mesIso));
 }
 
+export function realizadas(transacoes: Transacao[]) {
+  return transacoes.filter((transacao) => (transacao.status ?? 'realizado') === 'realizado');
+}
+
+export function previstas(transacoes: Transacao[]) {
+  return transacoes.filter((transacao) => (transacao.status ?? 'realizado') === 'previsto');
+}
+
 export function soma(transacoes: Transacao[], tipo?: 'receita' | 'despesa') {
   return transacoes
     .filter((transacao) => !tipo || transacao.tipo === tipo)
@@ -15,26 +24,37 @@ export function soma(transacoes: Transacao[], tipo?: 'receita' | 'despesa') {
 }
 
 export function resumoMensal(estado: AppState, mesIso: string) {
-  const transacoesMes = filtrarPorMes(estado.transacoes, mesIso);
+  const transacoesRealizadas = realizadas(estado.transacoes);
+  const transacoesMes = filtrarPorMes(transacoesRealizadas, mesIso);
   const receita = soma(transacoesMes, 'receita');
   const despesa = soma(transacoesMes, 'despesa');
   const economia = receita - despesa;
-  const saldoAtual = soma(estado.transacoes, 'receita') - soma(estado.transacoes, 'despesa');
+  const saldoAtual = soma(transacoesRealizadas, 'receita') - soma(transacoesRealizadas, 'despesa');
+  const futurasMes = recorrenciasFuturas(estado, 45).filter((item) => item.data.startsWith(mesIso) && !estado.transacoes.some((transacao) => transacao.recorrenciaId === item.recorrente.id && transacao.data === item.data));
+  const previstasMes = filtrarPorMes(previstas(estado.transacoes), mesIso);
+  const receitaPrevista = soma(previstasMes, 'receita') + futurasMes.filter((item) => item.recorrente.tipo === 'receita').reduce((total, item) => total + item.recorrente.valor, 0);
+  const despesaPrevista = soma(previstasMes, 'despesa') + futurasMes.filter((item) => item.recorrente.tipo === 'despesa').reduce((total, item) => total + item.recorrente.valor, 0);
+  const saldoPrevisto = saldoAtual + receitaPrevista - despesaPrevista;
   const totalInvestido = estado.investimentos.reduce((total, item) => total + item.valorInicial, 0);
   const metasAcumuladas = estado.metas.reduce((total, item) => total + item.valorAtual, 0);
   const patrimonioTotal = saldoAtual + totalInvestido + metasAcumuladas;
+  const rendaVariavelMes = estado.sessoesTrabalho.filter((sessao) => sessao.data.startsWith(mesIso)).reduce((total, sessao) => total + sessao.totalGanho, 0);
   return {
     saldoAtual,
     receita,
     despesa,
     economia,
+    saldoPrevisto,
+    receitaPrevista,
+    despesaPrevista,
+    rendaVariavelMes,
     patrimonioTotal,
     taxaEconomia: receita ? (economia / receita) * 100 : 0,
   };
 }
 
 export function gastosPorCategoria(estado: AppState, mesIso: string) {
-  const transacoes = filtrarPorMes(estado.transacoes, mesIso).filter((item) => item.tipo === 'despesa');
+  const transacoes = filtrarPorMes(realizadas(estado.transacoes), mesIso).filter((item) => item.tipo === 'despesa');
   return estado.categorias
     .filter((categoria) => categoria.tipo === 'despesa')
     .map((categoria) => ({
@@ -47,7 +67,7 @@ export function gastosPorCategoria(estado: AppState, mesIso: string) {
 
 export function evolucaoComAtual(estado: AppState, mesIso: string): HistoricoMensal[] {
   const meses = new Map<string, { receita: number; despesa: number }>();
-  estado.transacoes.forEach((transacao) => {
+  realizadas(estado.transacoes).forEach((transacao) => {
     const chave = transacao.data.slice(0, 7);
     const atual = meses.get(chave) ?? { receita: 0, despesa: 0 };
     atual[transacao.tipo] += transacao.valor;
@@ -114,7 +134,7 @@ export function projetarPatrimonio(estado: AppState, meses: number) {
 
 export function mediasMensais(estado: AppState) {
   const porMes = new Map<string, { receita: number; despesa: number }>();
-  estado.transacoes.forEach((transacao) => {
+  realizadas(estado.transacoes).forEach((transacao) => {
     const chave = transacao.data.slice(0, 7);
     const atual = porMes.get(chave) ?? { receita: 0, despesa: 0 };
     atual[transacao.tipo] += transacao.valor;

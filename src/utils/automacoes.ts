@@ -44,6 +44,8 @@ export function gerarRecorrenciasDoMes(estado: AppState, mesIso: string) {
           valor: recorrente.valor,
           data,
           recorrenciaId: recorrente.id,
+          recorrente: true,
+          status: 'previsto',
         });
       }
     });
@@ -68,6 +70,8 @@ export function gerarLancamentosRecorrentesAte(estado: AppState, dias: number) {
           valor: recorrente.valor,
           data,
           recorrenciaId: recorrente.id,
+          recorrente: true,
+          status: 'previsto',
         });
       }
     });
@@ -90,6 +94,8 @@ export function gerarLancamentosRecorrentesNaData(estado: AppState, data = new D
         valor: recorrente.valor,
         data: dataIso,
         recorrenciaId: recorrente.id,
+        recorrente: true,
+        status: 'previsto',
       });
     }
   });

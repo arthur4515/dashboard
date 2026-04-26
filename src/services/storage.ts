@@ -1,5 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { AppState, AuthUser, Categoria, Investimento, MetaFinanceira, Orcamento, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
+import { AppState, AuthUser, Categoria, Investimento, MetaFinanceira, Orcamento, SessaoTrabalho, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
 import { exigirSupabase } from './supabaseClient';
 
 type ProfileRow = {
@@ -14,13 +14,15 @@ type ProfileRow = {
 const SELECTS = {
   profiles: 'id, name, email, avatar, theme, savings_goal',
   categories: 'id, user_id, name, type, color, created_at',
-  transactions: 'id, user_id, type, category_id, description, amount, date, recurrence_id, imported, created_at',
+  transactions: 'id, user_id, title, type, category_id, amount, date, is_recurring, recurrence_id, status, imported, created_at',
+  transactionsLegacy: 'id, user_id, type, category_id, description, amount, date, recurrence_id, imported, created_at',
   budgets: 'id, user_id, category_id, limit_amount, created_at',
   investments: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, details, created_at',
   investmentsLegacy: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, created_at',
   goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
-  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, execution_day, created_at',
+  recurringTransactions: 'id, user_id, title, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, execution_day, auto_generate, created_at',
   recurringTransactionsLegacy: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
+  workSessions: 'id, user_id, date, hours_worked, hourly_rate, total_earned, transaction_id, created_at',
 } as const;
 
 function iniciais(nome: string) {
@@ -71,16 +73,17 @@ export async function garantirPerfil(user: User, nomeFallback?: string) {
 
 export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppState> {
   const supabase = exigirSupabase();
-  const [profile, categories, transactions, budgets, investmentsResult, goals, recurringResult] = await Promise.all([
+  const [profile, categories, transactionsResult, budgets, investmentsResult, goals, recurringResult, workSessionsResult] = await Promise.all([
     supabase.from('profiles').select(SELECTS.profiles).eq('id', usuario.id).maybeSingle<ProfileRow>(),
     supabase.from('categories').select(SELECTS.categories).eq('user_id', usuario.id),
-    supabase.from('transactions').select(SELECTS.transactions).eq('user_id', usuario.id),
+    selecionarComFallback('transactions', SELECTS.transactions, SELECTS.transactionsLegacy, usuario.id),
     supabase.from('budgets').select(SELECTS.budgets).eq('user_id', usuario.id),
     selecionarComFallback('investments', SELECTS.investments, SELECTS.investmentsLegacy, usuario.id),
     supabase.from('goals').select(SELECTS.goals).eq('user_id', usuario.id),
     selecionarComFallback('recurring_transactions', SELECTS.recurringTransactions, SELECTS.recurringTransactionsLegacy, usuario.id),
+    selecionarTabelaOpcional('work_sessions', SELECTS.workSessions, usuario.id),
   ]);
-  const erro = [profile.error, categories.error, transactions.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error].find(Boolean);
+  const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error].find(Boolean);
   if (erro) throw new Error(erro.message);
 
   const perfil = profile.data ?? {
@@ -102,12 +105,13 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
       metaEconomia: Number(perfil.savings_goal),
     },
     categorias: (categories.data ?? []).map((item) => ({ id: item.id, nome: item.name, tipo: item.type, cor: item.color })) as Categoria[],
-    transacoes: (transactions.data ?? []).map((item) => ({ id: item.id, tipo: item.type, categoriaId: item.category_id ?? '', descricao: item.description, valor: Number(item.amount), data: item.date, recorrenciaId: item.recurrence_id ?? undefined, importada: item.imported })) as Transacao[],
-    recorrentes: ((recurringResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as TransacaoRecorrente['tipo'], tipoRecorrencia: (item.kind ?? item.type) as TransacaoRecorrente['tipoRecorrencia'], categoriaId: String(item.category_id ?? ''), descricao: String(item.description ?? ''), valor: Number(item.amount), dataInicio: String(item.start_date), dataFinal: item.end_date ? String(item.end_date) : undefined, proximaData: item.next_date ? String(item.next_date) : undefined, diaExecucao: item.execution_day === null || item.execution_day === undefined ? undefined : Number(item.execution_day), frequencia: item.frequency as TransacaoRecorrente['frequencia'], status: (item.status ?? (item.active ? 'ativa' : 'pausada')) as TransacaoRecorrente['status'], ativa: Boolean(item.active) })) as TransacaoRecorrente[],
+    transacoes: ((transactionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as Transacao['tipo'], categoriaId: String(item.category_id ?? ''), descricao: String(item.title ?? item.description ?? ''), valor: Number(item.amount), data: String(item.date), recorrenciaId: item.recurrence_id ? String(item.recurrence_id) : undefined, importada: Boolean(item.imported), recorrente: Boolean(item.is_recurring ?? item.recurrence_id), status: (item.status ?? 'realizado') as Transacao['status'] })) as Transacao[],
+    recorrentes: ((recurringResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as TransacaoRecorrente['tipo'], tipoRecorrencia: (item.kind ?? item.type) as TransacaoRecorrente['tipoRecorrencia'], categoriaId: String(item.category_id ?? ''), descricao: String(item.title ?? item.description ?? ''), valor: Number(item.amount), dataInicio: String(item.start_date), dataFinal: item.end_date ? String(item.end_date) : undefined, proximaData: item.next_date ? String(item.next_date) : undefined, diaExecucao: item.execution_day === null || item.execution_day === undefined ? undefined : Number(item.execution_day), frequencia: item.frequency as TransacaoRecorrente['frequencia'], status: (item.status ?? (item.active ? 'ativa' : 'pausada')) as TransacaoRecorrente['status'], ativa: Boolean(item.active), gerarAutomatico: Boolean(item.auto_generate ?? false) })) as TransacaoRecorrente[],
     orcamentos: (budgets.data ?? []).map((item) => ({ id: item.id, categoriaId: item.category_id, limite: Number(item.limit_amount) })) as Orcamento[],
     investimentos: ((investmentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), nome: String(item.name ?? ''), tipo: item.type as Investimento['tipo'], valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return), detalhes: (item.details as Investimento['detalhes']) ?? {} })) as Investimento[],
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
     historicoMensal: [],
+    sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), valorHora: Number(item.hourly_rate), totalGanho: Number(item.total_earned), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
   };
 }
 
@@ -115,12 +119,16 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   const supabase = exigirSupabase();
   await atualizarPerfilSupabase(userId, estado.usuario);
   const suportaDetalhes = await colunaExiste('investments', 'details');
+  const suportaTransacaoSaas = await colunaExiste('transactions', 'title');
   const suportaRecorrenciaAvancada = await colunaExiste('recurring_transactions', 'kind');
   const suportaDiaExecucao = await colunaExiste('recurring_transactions', 'execution_day');
+  const suportaRecorrenciaSaas = await colunaExiste('recurring_transactions', 'title');
+  const suportaWorkSessions = await tabelaExiste('work_sessions');
   await Promise.all([
     supabase.from('transactions').delete().eq('user_id', userId),
     supabase.from('budgets').delete().eq('user_id', userId),
     supabase.from('recurring_transactions').delete().eq('user_id', userId),
+    suportaWorkSessions ? supabase.from('work_sessions').delete().eq('user_id', userId) : Promise.resolve({ error: null }),
   ]).then(verificarErros);
 
   await Promise.all([
@@ -131,7 +139,10 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
 
   await inserirLinhas('categories', estado.categorias.map((item) => ({ id: item.id, user_id: userId, name: item.nome, type: item.tipo, color: item.cor })));
   await Promise.all([
-    inserirLinhas('transactions', estado.transacoes.map((item) => ({ id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, date: item.data, recurrence_id: item.recorrenciaId ?? null, imported: item.importada ?? false }))),
+    inserirLinhas('transactions', estado.transacoes.map((item) => {
+      const base = { id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, amount: item.valor, date: item.data, recurrence_id: item.recorrenciaId ?? null, imported: item.importada ?? false };
+      return suportaTransacaoSaas ? { ...base, title: item.descricao, is_recurring: item.recorrente ?? Boolean(item.recorrenciaId), status: item.status ?? 'realizado' } : { ...base, description: item.descricao };
+    })),
     inserirLinhas('budgets', estado.orcamentos.map((item) => ({ id: item.id, user_id: userId, category_id: item.categoriaId, limit_amount: item.limite }))),
     inserirLinhas('investments', estado.investimentos.map((item) => {
       const base = { id: item.id, user_id: userId, name: item.nome, type: item.tipo, initial_amount: item.valorInicial, monthly_contribution: item.aporteMensal, expected_return: item.rentabilidadeEsperada, current_return: item.rentabilidadeAtual };
@@ -140,9 +151,11 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
     inserirLinhas('goals', estado.metas.map((item) => ({ id: item.id, user_id: userId, name: item.nome, target_amount: item.valorAlvo, current_amount: item.valorAtual, deadline: item.prazo }))),
     inserirLinhas('recurring_transactions', estado.recorrentes.map((item) => {
       const base = { id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, start_date: item.dataInicio, frequency: item.frequencia, active: item.status ? item.status === 'ativa' : item.ativa };
-      const avancado = suportaRecorrenciaAvancada ? { ...base, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio } : base;
+      const comSaas = suportaRecorrenciaSaas ? { ...base, title: item.descricao, auto_generate: item.gerarAutomatico ?? false } : base;
+      const avancado = suportaRecorrenciaAvancada ? { ...comSaas, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio } : comSaas;
       return suportaDiaExecucao ? { ...avancado, execution_day: item.diaExecucao ?? null } : avancado;
     })),
+    suportaWorkSessions ? inserirLinhas('work_sessions', estado.sessoesTrabalho.map((item) => ({ id: item.id, user_id: userId, date: item.data, hours_worked: item.horasTrabalhadas, hourly_rate: item.valorHora, total_earned: item.totalGanho, transaction_id: item.transacaoId ?? null }))) : Promise.resolve(),
   ]);
 }
 
@@ -187,9 +200,22 @@ async function selecionarComFallback(tabela: string, selectNovo: string, selectL
   return supabase.from(tabela).select(selectLegado).eq('user_id', userId);
 }
 
+async function selecionarTabelaOpcional(tabela: string, select: string, userId: string) {
+  const supabase = exigirSupabase();
+  const resultado = await supabase.from(tabela).select(select).eq('user_id', userId);
+  if (!resultado.error || /does not exist/i.test(resultado.error.message)) return { data: resultado.data ?? [], error: null };
+  return resultado;
+}
+
 async function colunaExiste(tabela: string, coluna: string) {
   const supabase = exigirSupabase();
   const { error } = await supabase.from(tabela).select(coluna).limit(1);
+  return !error;
+}
+
+async function tabelaExiste(tabela: string) {
+  const supabase = exigirSupabase();
+  const { error } = await supabase.from(tabela).select('id').limit(1);
   return !error;
 }
 
@@ -221,5 +247,6 @@ function criarEstadoVazio(usuario: AuthUser): AppState {
     investimentos: [],
     metas: [],
     historicoMensal: [],
+    sessoesTrabalho: [],
   };
 }
