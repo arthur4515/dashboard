@@ -119,3 +119,43 @@ create policy "Users can update own settings"
 create policy "Users can delete own settings"
   on public.user_settings for delete
   using (auth.uid() = user_id);
+
+create table if not exists public.payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  amount numeric not null check (amount >= 0),
+  type text not null check (type in ('vale', 'salario')),
+  date date not null,
+  transaction_id uuid null references public.transactions(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.payments
+  add column if not exists transaction_id uuid null references public.transactions(id) on delete set null;
+
+alter table public.payments enable row level security;
+
+drop policy if exists "Users can view own payments" on public.payments;
+drop policy if exists "Users can insert own payments" on public.payments;
+drop policy if exists "Users can update own payments" on public.payments;
+drop policy if exists "Users can delete own payments" on public.payments;
+
+create policy "Users can view own payments"
+  on public.payments for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own payments"
+  on public.payments for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own payments"
+  on public.payments for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own payments"
+  on public.payments for delete
+  using (auth.uid() = user_id);
+
+create index if not exists payments_user_date_idx on public.payments(user_id, date desc);
+create unique index if not exists payments_user_type_date_idx on public.payments(user_id, type, date);

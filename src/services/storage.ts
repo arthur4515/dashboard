@@ -1,5 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { AppState, AuthUser, Categoria, ConfiguracaoRendaVariavel, Investimento, MetaFinanceira, Orcamento, SessaoTrabalho, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
+import { AppState, AuthUser, Categoria, ConfiguracaoRendaVariavel, Investimento, MetaFinanceira, Orcamento, Pagamento, SessaoTrabalho, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
 import { exigirSupabase } from './supabaseClient';
 
 type ProfileRow = {
@@ -24,6 +24,8 @@ const SELECTS = {
   recurringTransactionsLegacy: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
   workSessions: 'id, user_id, date, hours_worked, hourly_rate, total_earned, type, transaction_id, created_at',
   workSessionsLegacy: 'id, user_id, date, hours_worked, hourly_rate, total_earned, transaction_id, created_at',
+  payments: 'id, user_id, amount, type, date, transaction_id, created_at',
+  paymentsLegacy: 'id, user_id, amount, type, date, created_at',
   userSettings: 'id, user_id, default_hourly_rate, default_daily_hours, overtime_multiplier, created_at',
 } as const;
 
@@ -75,7 +77,7 @@ export async function garantirPerfil(user: User, nomeFallback?: string) {
 
 export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppState> {
   const supabase = exigirSupabase();
-  const [profile, categories, transactionsResult, budgets, investmentsResult, goals, recurringResult, workSessionsResult, userSettingsResult] = await Promise.all([
+  const [profile, categories, transactionsResult, budgets, investmentsResult, goals, recurringResult, workSessionsResult, paymentsResult, userSettingsResult] = await Promise.all([
     supabase.from('profiles').select(SELECTS.profiles).eq('id', usuario.id).maybeSingle<ProfileRow>(),
     supabase.from('categories').select(SELECTS.categories).eq('user_id', usuario.id),
     selecionarComFallback('transactions', SELECTS.transactions, SELECTS.transactionsLegacy, usuario.id),
@@ -84,9 +86,10 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     supabase.from('goals').select(SELECTS.goals).eq('user_id', usuario.id),
     selecionarComFallback('recurring_transactions', SELECTS.recurringTransactions, SELECTS.recurringTransactionsLegacy, usuario.id),
     selecionarTabelaOpcionalComFallback('work_sessions', SELECTS.workSessions, SELECTS.workSessionsLegacy, usuario.id),
+    selecionarTabelaOpcionalComFallback('payments', SELECTS.payments, SELECTS.paymentsLegacy, usuario.id),
     selecionarTabelaOpcional('user_settings', SELECTS.userSettings, usuario.id),
   ]);
-  const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error, userSettingsResult.error].find(Boolean);
+  const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error, paymentsResult.error, userSettingsResult.error].find(Boolean);
   if (erro) throw new Error(erro.message);
 
   const perfil = profile.data ?? {
@@ -121,6 +124,7 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
     historicoMensal: [],
     sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), valorHora: Number(item.hourly_rate), totalGanho: Number(item.total_earned), tipo: (item.type ?? 'normal') as SessaoTrabalho['tipo'], transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
+    pagamentos: ((paymentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as Pagamento['tipo'], valor: Number(item.amount), data: String(item.date), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as Pagamento[],
     configuracaoRendaVariavel,
   };
 }
@@ -135,12 +139,15 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   const suportaRecorrenciaSaas = await colunaExiste('recurring_transactions', 'title');
   const suportaWorkSessions = await tabelaExiste('work_sessions');
   const suportaWorkSessionTipo = suportaWorkSessions && await colunaExiste('work_sessions', 'type');
+  const suportaPayments = await tabelaExiste('payments');
+  const suportaPaymentTransaction = suportaPayments && await colunaExiste('payments', 'transaction_id');
   const suportaUserSettings = await tabelaExiste('user_settings');
   await Promise.all([
     supabase.from('transactions').delete().eq('user_id', userId),
     supabase.from('budgets').delete().eq('user_id', userId),
     supabase.from('recurring_transactions').delete().eq('user_id', userId),
     suportaWorkSessions ? supabase.from('work_sessions').delete().eq('user_id', userId) : Promise.resolve({ error: null }),
+    suportaPayments ? supabase.from('payments').delete().eq('user_id', userId) : Promise.resolve({ error: null }),
   ]).then(verificarErros);
 
   await Promise.all([
@@ -170,6 +177,10 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
     suportaWorkSessions ? inserirLinhas('work_sessions', estado.sessoesTrabalho.map((item) => {
       const base = { id: item.id, user_id: userId, date: item.data, hours_worked: item.horasTrabalhadas, hourly_rate: item.valorHora, total_earned: item.totalGanho, transaction_id: item.transacaoId ?? null };
       return suportaWorkSessionTipo ? { ...base, type: item.tipo ?? 'normal' } : base;
+    })) : Promise.resolve(),
+    suportaPayments ? inserirLinhas('payments', estado.pagamentos.map((item) => {
+      const base = { id: item.id, user_id: userId, amount: item.valor, type: item.tipo, date: item.data };
+      return suportaPaymentTransaction ? { ...base, transaction_id: item.transacaoId ?? null } : base;
     })) : Promise.resolve(),
     suportaUserSettings ? inserirLinhasComConflito('user_settings', [{
       user_id: userId,
@@ -289,6 +300,7 @@ function criarEstadoVazio(usuario: AuthUser): AppState {
     metas: [],
     historicoMensal: [],
     sessoesTrabalho: [],
+    pagamentos: [],
     configuracaoRendaVariavel: {
       valorHoraPadrao: 25,
       horasPadraoDia: 8,

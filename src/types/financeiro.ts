@@ -43,6 +43,7 @@ export type TransacaoRecorrente = {
 };
 
 export type TipoSessaoTrabalho = 'normal' | 'falta' | 'extra';
+export type TipoPagamento = 'vale' | 'salario';
 
 export type SessaoTrabalho = {
   id: string;
@@ -58,6 +59,14 @@ export type ConfiguracaoRendaVariavel = {
   valorHoraPadrao: number;
   horasPadraoDia: number;
   multiplicadorHoraExtra: number;
+};
+
+export type Pagamento = {
+  id: string;
+  tipo: TipoPagamento;
+  valor: number;
+  data: string;
+  transacaoId?: string;
 };
 
 export type Orcamento = {
@@ -141,6 +150,7 @@ export type AppState = {
   metas: MetaFinanceira[];
   historicoMensal: HistoricoMensal[];
   sessoesTrabalho: SessaoTrabalho[];
+  pagamentos: Pagamento[];
   configuracaoRendaVariavel: ConfiguracaoRendaVariavel;
 };
 

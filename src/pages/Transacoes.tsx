@@ -399,6 +399,7 @@ function simularExecucoes(recorrente: TransacaoRecorrente) {
     metas: [],
     historicoMensal: [],
     sessoesTrabalho: [],
+    pagamentos: [],
     configuracaoRendaVariavel: {
       valorHoraPadrao: 25,
       horasPadraoDia: 8,
