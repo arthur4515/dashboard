@@ -83,7 +83,7 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
   if (erro) throw new Error(erro.message);
 
   if ((categories.data ?? []).length === 0) {
-    const exemplo = criarDadosExemplo(usuario);
+    const exemplo = criarDadosExemploNuvem(usuario);
     await salvarEstadoSupabase(usuario.id, exemplo);
     return exemplo;
   }
@@ -142,7 +142,7 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
 }
 
 export async function resetarDadosSupabase(usuario: AuthUser) {
-  const dados = criarDadosExemplo(usuario);
+  const dados = criarDadosExemploNuvem(usuario);
   await salvarEstadoSupabase(usuario.id, dados);
   return dados;
 }
@@ -183,5 +183,44 @@ export function authUserFromSupabase(user: User, nomeFallback?: string): AuthUse
     email: user.email ?? '',
     avatar: String(user.user_metadata?.avatar || iniciais(nome)),
     tema: 'light',
+  };
+}
+
+function criarDadosExemploNuvem(usuario: AuthUser): AppState {
+  const dados = criarDadosExemplo(usuario);
+  const prefixo = usuario.id;
+  const categoriaIds = new Map(dados.categorias.map((categoria) => [categoria.id, `${prefixo}-${categoria.id}`]));
+  const recorrenciaIds = new Map(dados.recorrentes.map((recorrente) => [recorrente.id, `${prefixo}-${recorrente.id}`]));
+
+  return {
+    ...dados,
+    categorias: dados.categorias.map((categoria) => ({
+      ...categoria,
+      id: categoriaIds.get(categoria.id) ?? `${prefixo}-${categoria.id}`,
+    })),
+    transacoes: dados.transacoes.map((transacao) => ({
+      ...transacao,
+      id: `${prefixo}-${transacao.id}`,
+      categoriaId: categoriaIds.get(transacao.categoriaId) ?? transacao.categoriaId,
+      recorrenciaId: transacao.recorrenciaId ? recorrenciaIds.get(transacao.recorrenciaId) : undefined,
+    })),
+    recorrentes: dados.recorrentes.map((recorrente) => ({
+      ...recorrente,
+      id: recorrenciaIds.get(recorrente.id) ?? `${prefixo}-${recorrente.id}`,
+      categoriaId: categoriaIds.get(recorrente.categoriaId) ?? recorrente.categoriaId,
+    })),
+    orcamentos: dados.orcamentos.map((orcamento) => ({
+      ...orcamento,
+      id: `${prefixo}-${orcamento.id}`,
+      categoriaId: categoriaIds.get(orcamento.categoriaId) ?? orcamento.categoriaId,
+    })),
+    investimentos: dados.investimentos.map((investimento) => ({
+      ...investimento,
+      id: `${prefixo}-${investimento.id}`,
+    })),
+    metas: dados.metas.map((meta) => ({
+      ...meta,
+      id: `${prefixo}-${meta.id}`,
+    })),
   };
 }
