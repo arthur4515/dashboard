@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AuthUser } from '../types/financeiro';
 import { carregarEstadoSupabase, resetarDadosSupabase, salvarEstadoSupabase } from '../services/storage';
+import { gerarLancamentosRecorrentesNaData } from '../utils/automacoes';
 
 export function useFinanceData(usuario: AuthUser | null) {
   const [estado, setEstado] = useState<AppState | null>(null);
@@ -20,7 +21,8 @@ export function useFinanceData(usuario: AuthUser | null) {
     setCarregando(true);
     carregarEstadoSupabase(usuario)
       .then((dados) => {
-        setEstado(dados);
+        const geradosHoje = gerarLancamentosRecorrentesNaData(dados);
+        setEstado(geradosHoje.length > 0 ? { ...dados, transacoes: [...geradosHoje, ...dados.transacoes] } : dados);
         carregouInicial.current = true;
       })
       .catch((erro) => {

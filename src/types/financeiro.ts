@@ -18,8 +18,8 @@ export type Transacao = {
   importada?: boolean;
 };
 
-export type FrequenciaRecorrencia = 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
-export type StatusRecorrencia = 'ativa' | 'pausada' | 'encerrada';
+export type FrequenciaRecorrencia = 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
+export type StatusRecorrencia = 'ativa' | 'inativa' | 'pausada' | 'encerrada';
 export type TipoRecorrencia = 'receita' | 'despesa' | 'aporte';
 
 export type TransacaoRecorrente = {
@@ -32,6 +32,7 @@ export type TransacaoRecorrente = {
   dataInicio: string;
   dataFinal?: string;
   proximaData?: string;
+  diaExecucao?: number;
   frequencia: FrequenciaRecorrencia;
   status?: StatusRecorrencia;
   ativa: boolean;

@@ -19,7 +19,7 @@ const SELECTS = {
   investments: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, details, created_at',
   investmentsLegacy: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, created_at',
   goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
-  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, created_at',
+  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, execution_day, created_at',
   recurringTransactionsLegacy: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
 } as const;
 
@@ -103,7 +103,7 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     },
     categorias: (categories.data ?? []).map((item) => ({ id: item.id, nome: item.name, tipo: item.type, cor: item.color })) as Categoria[],
     transacoes: (transactions.data ?? []).map((item) => ({ id: item.id, tipo: item.type, categoriaId: item.category_id ?? '', descricao: item.description, valor: Number(item.amount), data: item.date, recorrenciaId: item.recurrence_id ?? undefined, importada: item.imported })) as Transacao[],
-    recorrentes: ((recurringResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as TransacaoRecorrente['tipo'], tipoRecorrencia: (item.kind ?? item.type) as TransacaoRecorrente['tipoRecorrencia'], categoriaId: String(item.category_id ?? ''), descricao: String(item.description ?? ''), valor: Number(item.amount), dataInicio: String(item.start_date), dataFinal: item.end_date ? String(item.end_date) : undefined, proximaData: item.next_date ? String(item.next_date) : undefined, frequencia: item.frequency as TransacaoRecorrente['frequencia'], status: (item.status ?? (item.active ? 'ativa' : 'pausada')) as TransacaoRecorrente['status'], ativa: Boolean(item.active) })) as TransacaoRecorrente[],
+    recorrentes: ((recurringResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as TransacaoRecorrente['tipo'], tipoRecorrencia: (item.kind ?? item.type) as TransacaoRecorrente['tipoRecorrencia'], categoriaId: String(item.category_id ?? ''), descricao: String(item.description ?? ''), valor: Number(item.amount), dataInicio: String(item.start_date), dataFinal: item.end_date ? String(item.end_date) : undefined, proximaData: item.next_date ? String(item.next_date) : undefined, diaExecucao: item.execution_day === null || item.execution_day === undefined ? undefined : Number(item.execution_day), frequencia: item.frequency as TransacaoRecorrente['frequencia'], status: (item.status ?? (item.active ? 'ativa' : 'pausada')) as TransacaoRecorrente['status'], ativa: Boolean(item.active) })) as TransacaoRecorrente[],
     orcamentos: (budgets.data ?? []).map((item) => ({ id: item.id, categoriaId: item.category_id, limite: Number(item.limit_amount) })) as Orcamento[],
     investimentos: ((investmentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), nome: String(item.name ?? ''), tipo: item.type as Investimento['tipo'], valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return), detalhes: (item.details as Investimento['detalhes']) ?? {} })) as Investimento[],
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
@@ -116,6 +116,7 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   await atualizarPerfilSupabase(userId, estado.usuario);
   const suportaDetalhes = await colunaExiste('investments', 'details');
   const suportaRecorrenciaAvancada = await colunaExiste('recurring_transactions', 'kind');
+  const suportaDiaExecucao = await colunaExiste('recurring_transactions', 'execution_day');
   await Promise.all([
     supabase.from('transactions').delete().eq('user_id', userId),
     supabase.from('budgets').delete().eq('user_id', userId),
@@ -139,7 +140,8 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
     inserirLinhas('goals', estado.metas.map((item) => ({ id: item.id, user_id: userId, name: item.nome, target_amount: item.valorAlvo, current_amount: item.valorAtual, deadline: item.prazo }))),
     inserirLinhas('recurring_transactions', estado.recorrentes.map((item) => {
       const base = { id: item.id, user_id: userId, type: item.tipo, category_id: item.categoriaId || null, description: item.descricao, amount: item.valor, start_date: item.dataInicio, frequency: item.frequencia, active: item.status ? item.status === 'ativa' : item.ativa };
-      return suportaRecorrenciaAvancada ? { ...base, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio } : base;
+      const avancado = suportaRecorrenciaAvancada ? { ...base, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio } : base;
+      return suportaDiaExecucao ? { ...avancado, execution_day: item.diaExecucao ?? null } : avancado;
     })),
   ]);
 }

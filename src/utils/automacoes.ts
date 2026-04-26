@@ -75,6 +75,27 @@ export function gerarLancamentosRecorrentesAte(estado: AppState, dias: number) {
   return novas;
 }
 
+export function gerarLancamentosRecorrentesNaData(estado: AppState, data = new Date()) {
+  const dataIso = data.toISOString().slice(0, 10);
+  const novas: Transacao[] = [];
+  estado.recorrentes.filter(recorrenciaAtiva).forEach((recorrente) => {
+    if (!recorrenciaExecutaNaData(recorrente, data)) return;
+    const existe = estado.transacoes.some((transacao) => transacao.recorrenciaId === recorrente.id && transacao.data === dataIso);
+    if (!existe) {
+      novas.push({
+        id: uid('auto'),
+        tipo: recorrente.tipo,
+        categoriaId: recorrente.categoriaId,
+        descricao: recorrente.descricao,
+        valor: recorrente.valor,
+        data: dataIso,
+        recorrenciaId: recorrente.id,
+      });
+    }
+  });
+  return novas;
+}
+
 export function recorrenciasFuturas(estado: AppState, dias = 90) {
   const hoje = new Date();
   const fim = new Date();
@@ -192,6 +213,7 @@ function datasDaRecorrencia(recorrente: TransacaoRecorrente, mesIso: string) {
 }
 
 function avancar(data: Date, frequencia: FrequenciaRecorrencia) {
+  if (frequencia === 'diaria') data.setDate(data.getDate() + 1);
   if (frequencia === 'semanal') data.setDate(data.getDate() + 7);
   if (frequencia === 'quinzenal') data.setDate(data.getDate() + 15);
   if (frequencia === 'mensal') data.setMonth(data.getMonth() + 1);
@@ -206,17 +228,54 @@ function datasEntre(recorrente: TransacaoRecorrente, inicioJanela: Date, fimJane
   const fimRecorrencia = recorrente.dataFinal ? new Date(`${recorrente.dataFinal}T23:59:59`) : null;
   if (inicio > fimJanela || (fimRecorrencia && fimRecorrencia < inicioJanela)) return [];
   const datas: string[] = [];
-  const cursor = new Date(inicio);
-  while (cursor < inicioJanela) avancar(cursor, recorrente.frequencia);
+  const cursor = new Date(Math.max(inicio.getTime(), inicioJanela.getTime()));
+  cursor.setHours(0, 0, 0, 0);
   while (cursor <= fimJanela && (!fimRecorrencia || cursor <= fimRecorrencia)) {
-    datas.push(cursor.toISOString().slice(0, 10));
-    avancar(cursor, recorrente.frequencia);
+    if (recorrenciaExecutaNaData(recorrente, cursor)) {
+      datas.push(cursor.toISOString().slice(0, 10));
+    }
+    cursor.setDate(cursor.getDate() + 1);
   }
   return datas;
 }
 
 function recorrenciaAtiva(recorrente: TransacaoRecorrente) {
   return (recorrente.status ?? (recorrente.ativa ? 'ativa' : 'pausada')) === 'ativa';
+}
+
+function recorrenciaExecutaNaData(recorrente: TransacaoRecorrente, data: Date) {
+  const inicio = new Date(`${recorrente.dataInicio}T00:00:00`);
+  const fim = recorrente.dataFinal ? new Date(`${recorrente.dataFinal}T23:59:59`) : null;
+  if (data < inicio || (fim && data > fim)) return false;
+  if (recorrente.frequencia === 'diaria') return true;
+  if (recorrente.frequencia === 'semanal') return data.getDay() === Number(recorrente.diaExecucao ?? inicio.getDay());
+  if (recorrente.frequencia === 'mensal') return data.getDate() === Math.min(Number(recorrente.diaExecucao ?? inicio.getDate()), ultimoDiaDoMes(data));
+  if (recorrente.frequencia === 'quinzenal') return diffDias(inicio, data) % 15 === 0;
+  if (recorrente.frequencia === 'anual') {
+    return data.getMonth() === inicio.getMonth() && data.getDate() === Math.min(inicio.getDate(), ultimoDiaDoMes(data));
+  }
+  const intervaloMeses = intervaloEmMeses(recorrente.frequencia);
+  if (!intervaloMeses) return false;
+  const meses = (data.getFullYear() - inicio.getFullYear()) * 12 + data.getMonth() - inicio.getMonth();
+  return meses >= 0 && meses % intervaloMeses === 0 && data.getDate() === Math.min(inicio.getDate(), ultimoDiaDoMes(data));
+}
+
+function diffDias(inicio: Date, fim: Date) {
+  const umDia = 1000 * 60 * 60 * 24;
+  const a = Date.UTC(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+  const b = Date.UTC(fim.getFullYear(), fim.getMonth(), fim.getDate());
+  return Math.floor((b - a) / umDia);
+}
+
+function intervaloEmMeses(frequencia: FrequenciaRecorrencia) {
+  if (frequencia === 'bimestral') return 2;
+  if (frequencia === 'trimestral') return 3;
+  if (frequencia === 'semestral') return 6;
+  return 0;
+}
+
+function ultimoDiaDoMes(data: Date) {
+  return new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
 }
 
 function addDias(data: Date, dias: number) {
