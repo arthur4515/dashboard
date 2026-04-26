@@ -1,4 +1,4 @@
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Landmark, PiggyBank, TrendingUp, Wallet } from 'lucide-react';
 import { AppState } from '../types/financeiro';
 import { evolucaoComAtual, gastosPorCategoria, resumoMensal } from '../utils/calculos';
@@ -7,6 +7,7 @@ import { MetricCard } from '../components/MetricCard';
 import { Section } from '../components/Section';
 import { EmptyState } from '../components/EmptyState';
 import { insightsFinanceiros } from '../utils/automacoes';
+import { ChartFrame } from '../components/ChartFrame';
 
 export function Dashboard({ estado }: { estado: AppState }) {
   const mes = mesAtualISO();
@@ -40,44 +41,38 @@ export function Dashboard({ estado }: { estado: AppState }) {
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Section titulo="Evolucao financeira">
           {evolucao.length === 0 ? <EmptyState icon={TrendingUp} titulo="Sem historico suficiente" texto="Adicione transacoes para montar a evolucao financeira." /> : (
-            <div className="h-80">
-              <ResponsiveContainer>
-                <AreaChart data={evolucao}>
-                  <defs><linearGradient id="patrimonio" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} /><stop offset="95%" stopColor="#7C3AED" stopOpacity={0} /></linearGradient></defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                  <Area dataKey="patrimonio" stroke="#7C3AED" fill="url(#patrimonio)" strokeWidth={3} />
-                  <Area dataKey="investimentos" stroke="#A78BFA" fill="transparent" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartFrame className="h-[320px]">
+              <AreaChart data={evolucao}>
+                <defs><linearGradient id="patrimonio" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} /><stop offset="95%" stopColor="#7C3AED" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+                <Area dataKey="patrimonio" stroke="#7C3AED" fill="url(#patrimonio)" strokeWidth={3} />
+                <Area dataKey="investimentos" stroke="#A78BFA" fill="transparent" strokeWidth={2} />
+              </AreaChart>
+            </ChartFrame>
           )}
         </Section>
 
         <Section titulo="Gastos por categoria">
           {categorias.length === 0 ? <EmptyState icon={AlertTriangle} titulo="Sem despesas no mes" texto="Quando houver despesas, o grafico aparece aqui." /> : (
-            <div className="h-80">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={categorias} dataKey="value" nameKey="name" innerRadius={70} outerRadius={112} paddingAngle={4}>{categorias.map((item) => <Cell key={item.name} fill={item.fill} />)}</Pie>
-                  <Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartFrame className="h-[320px]">
+              <PieChart>
+                <Pie data={categorias} dataKey="value" nameKey="name" innerRadius={70} outerRadius={112} paddingAngle={4}>{categorias.map((item) => <Cell key={item.name} fill={item.fill} />)}</Pie>
+                <Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              </PieChart>
+            </ChartFrame>
           )}
         </Section>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <Section titulo="Receitas x despesas">
-          <div className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={evolucao}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Bar dataKey="receita" fill="#10B981" radius={[6, 6, 0, 0]} /><Bar dataKey="despesa" fill="#EF4444" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-[300px]">
+            <BarChart data={evolucao}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              <Bar dataKey="receita" fill="#10B981" radius={[6, 6, 0, 0]} /><Bar dataKey="despesa" fill="#EF4444" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ChartFrame>
         </Section>
 
         <Section titulo="Ultimas transacoes">

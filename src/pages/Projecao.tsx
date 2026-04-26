@@ -1,8 +1,9 @@
-import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { AppState } from '../types/financeiro';
 import { Section } from '../components/Section';
 import { formatarMoeda } from '../utils/formatadores';
 import { mediasMensais, projetarPatrimonio, resumoMensal } from '../utils/calculos';
+import { ChartFrame } from '../components/ChartFrame';
 
 export function Projecao({ estado }: { estado: AppState }) {
   const resumo = resumoMensal(estado, new Date().toISOString().slice(0, 7));
@@ -32,24 +33,20 @@ export function Projecao({ estado }: { estado: AppState }) {
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Section titulo="Curva de longo prazo">
-          <div className="h-80">
-            <ResponsiveContainer>
-              <AreaChart data={serie}>
-                <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Area dataKey="patrimonio" stroke="#7C3AED" fill="#7C3AED22" strokeWidth={3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-[320px]">
+            <AreaChart data={serie}>
+              <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              <Area dataKey="patrimonio" stroke="#7C3AED" fill="#7C3AED22" strokeWidth={3} />
+            </AreaChart>
+          </ChartFrame>
         </Section>
         <Section titulo="Comparativo">
-          <div className="h-80">
-            <ResponsiveContainer>
-              <BarChart data={pontos}>
-                <XAxis dataKey="periodo" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Bar dataKey="patrimonio" fill="#7C3AED" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-[320px]">
+            <BarChart data={pontos}>
+              <XAxis dataKey="periodo" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              <Bar dataKey="patrimonio" fill="#7C3AED" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ChartFrame>
         </Section>
       </div>
     </div>

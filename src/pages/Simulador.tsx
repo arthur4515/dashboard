@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Calculator, CircleDollarSign, Percent, Wallet } from 'lucide-react';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { MetricCard } from '../components/MetricCard';
 import { Section } from '../components/Section';
 import { formatarMoeda } from '../utils/formatadores';
 import { simularCompostos } from '../utils/calculos';
+import { ChartFrame } from '../components/ChartFrame';
 
 export function Simulador() {
   const [valorInicial, setValorInicial] = useState(10000);
@@ -45,15 +46,13 @@ export function Simulador() {
         </Section>
 
         <Section titulo="Evolução mês a mês">
-          <div className="h-80">
-            <ResponsiveContainer>
-              <LineChart data={resultado.serie}>
-                <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Line dataKey="saldo" stroke="#7C3AED" strokeWidth={3} dot={false} />
-                <Line dataKey="investido" stroke="#A78BFA" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-[320px]">
+            <LineChart data={resultado.serie}>
+              <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              <Line dataKey="saldo" stroke="#7C3AED" strokeWidth={3} dot={false} />
+              <Line dataKey="investido" stroke="#A78BFA" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ChartFrame>
         </Section>
       </div>
 

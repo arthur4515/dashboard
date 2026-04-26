@@ -1,12 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { Edit3, Plus, Trash2, TrendingUp } from 'lucide-react';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { AppState, Investimento, TipoInvestimento } from '../types/financeiro';
 import { MetricCard } from '../components/MetricCard';
 import { Modal } from '../components/Modal';
 import { Section } from '../components/Section';
 import { formatarMoeda } from '../utils/formatadores';
 import { projetarInvestimento, uid } from '../utils/calculos';
+import { ChartFrame } from '../components/ChartFrame';
 
 type Props = {
   estado: AppState;
@@ -65,14 +66,12 @@ export function Investimentos({ estado, setEstado, avisar }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <Section titulo="Evolucao dos investimentos" acao={<button className="btn-primary" onClick={() => abrir()}><Plus size={18} />Novo investimento</button>}>
-          <div className="h-80">
-            <ResponsiveContainer>
-              <LineChart data={serie}>
-                <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Line dataKey="valor" stroke="#7C3AED" strokeWidth={3} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-[320px]">
+            <LineChart data={serie}>
+              <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
+              <Line dataKey="valor" stroke="#7C3AED" strokeWidth={3} dot={false} />
+            </LineChart>
+          </ChartFrame>
         </Section>
 
         <Section titulo="Carteira">
