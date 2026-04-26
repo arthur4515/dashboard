@@ -404,6 +404,9 @@ function simularExecucoes(recorrente: TransacaoRecorrente) {
       valorHoraPadrao: 25,
       horasPadraoDia: 8,
       multiplicadorHoraExtra: 1.5,
+      descontoInss: 0,
+      descontoFgts: 0,
+      outrosDescontos: 0,
     },
   };
   return recorrenciasFuturas(estadoTemporario, 90)

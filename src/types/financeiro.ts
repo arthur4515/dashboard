@@ -42,16 +42,22 @@ export type TransacaoRecorrente = {
   gerarAutomatico?: boolean;
 };
 
-export type TipoSessaoTrabalho = 'normal' | 'falta' | 'extra';
+export type TipoSessaoTrabalho = 'normal' | 'falta' | 'extra' | 'folga';
 export type TipoPagamento = 'vale' | 'salario';
 
 export type SessaoTrabalho = {
   id: string;
   data: string;
   horasTrabalhadas: number;
+  horasExtras?: number;
   valorHora: number;
   totalGanho: number;
   tipo?: TipoSessaoTrabalho;
+  trabalhou?: boolean;
+  falta?: boolean;
+  descontos?: number;
+  valorBruto?: number;
+  valorLiquido?: number;
   transacaoId?: string;
 };
 
@@ -59,12 +65,18 @@ export type ConfiguracaoRendaVariavel = {
   valorHoraPadrao: number;
   horasPadraoDia: number;
   multiplicadorHoraExtra: number;
+  descontoInss: number;
+  descontoFgts: number;
+  outrosDescontos: number;
 };
 
 export type Pagamento = {
   id: string;
   tipo: TipoPagamento;
   valor: number;
+  valorBruto?: number;
+  descontos?: number;
+  valorLiquido?: number;
   data: string;
   transacaoId?: string;
 };

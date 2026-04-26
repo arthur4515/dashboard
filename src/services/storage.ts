@@ -22,11 +22,12 @@ const SELECTS = {
   goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
   recurringTransactions: 'id, user_id, title, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, execution_day, auto_generate, created_at',
   recurringTransactionsLegacy: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
-  workSessions: 'id, user_id, date, hours_worked, hourly_rate, total_earned, type, transaction_id, created_at',
+  workSessions: 'id, user_id, date, hours_worked, hours_extra, hourly_rate, total_earned, type, worked, is_absent, discounts, gross_earned, net_earned, transaction_id, created_at',
   workSessionsLegacy: 'id, user_id, date, hours_worked, hourly_rate, total_earned, transaction_id, created_at',
-  payments: 'id, user_id, amount, type, date, transaction_id, created_at',
+  payments: 'id, user_id, amount, gross_amount, discounts, net_amount, type, date, transaction_id, created_at',
   paymentsLegacy: 'id, user_id, amount, type, date, created_at',
-  userSettings: 'id, user_id, default_hourly_rate, default_daily_hours, overtime_multiplier, created_at',
+  userSettings: 'id, user_id, hourly_rate, default_hours, overtime_multiplier, discount_inss, discount_fgts, other_discounts, created_at',
+  userSettingsLegacy: 'id, user_id, default_hourly_rate, default_daily_hours, overtime_multiplier, created_at',
 } as const;
 
 function iniciais(nome: string) {
@@ -87,7 +88,7 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     selecionarComFallback('recurring_transactions', SELECTS.recurringTransactions, SELECTS.recurringTransactionsLegacy, usuario.id),
     selecionarTabelaOpcionalComFallback('work_sessions', SELECTS.workSessions, SELECTS.workSessionsLegacy, usuario.id),
     selecionarTabelaOpcionalComFallback('payments', SELECTS.payments, SELECTS.paymentsLegacy, usuario.id),
-    selecionarTabelaOpcional('user_settings', SELECTS.userSettings, usuario.id),
+    selecionarTabelaOpcionalComFallback('user_settings', SELECTS.userSettings, SELECTS.userSettingsLegacy, usuario.id),
   ]);
   const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error, paymentsResult.error, userSettingsResult.error].find(Boolean);
   if (erro) throw new Error(erro.message);
@@ -102,9 +103,12 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
   };
   const settings = ((userSettingsResult.data ?? []) as unknown as Record<string, unknown>[])[0];
   const configuracaoRendaVariavel: ConfiguracaoRendaVariavel = {
-    valorHoraPadrao: Number(settings?.default_hourly_rate ?? 25),
-    horasPadraoDia: Number(settings?.default_daily_hours ?? 8),
+    valorHoraPadrao: Number(settings?.hourly_rate ?? settings?.default_hourly_rate ?? 25),
+    horasPadraoDia: Number(settings?.default_hours ?? settings?.default_daily_hours ?? 8),
     multiplicadorHoraExtra: Number(settings?.overtime_multiplier ?? 1.5),
+    descontoInss: Number(settings?.discount_inss ?? 0),
+    descontoFgts: Number(settings?.discount_fgts ?? 0),
+    outrosDescontos: Number(settings?.other_discounts ?? 0),
   };
 
   return {
@@ -123,8 +127,8 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     investimentos: ((investmentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), nome: String(item.name ?? ''), tipo: item.type as Investimento['tipo'], valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return), detalhes: (item.details as Investimento['detalhes']) ?? {} })) as Investimento[],
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
     historicoMensal: [],
-    sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), valorHora: Number(item.hourly_rate), totalGanho: Number(item.total_earned), tipo: (item.type ?? 'normal') as SessaoTrabalho['tipo'], transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
-    pagamentos: ((paymentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as Pagamento['tipo'], valor: Number(item.amount), data: String(item.date), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as Pagamento[],
+    sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), horasExtras: Number(item.hours_extra ?? 0), valorHora: Number(item.hourly_rate), totalGanho: Number(item.net_earned ?? item.total_earned), tipo: (item.type ?? 'normal') as SessaoTrabalho['tipo'], trabalhou: item.worked === undefined ? Number(item.hours_worked) > 0 : Boolean(item.worked), falta: item.is_absent === undefined ? item.type === 'falta' : Boolean(item.is_absent), descontos: Number(item.discounts ?? 0), valorBruto: Number(item.gross_earned ?? item.total_earned), valorLiquido: Number(item.net_earned ?? item.total_earned), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
+    pagamentos: ((paymentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), tipo: item.type as Pagamento['tipo'], valor: Number(item.net_amount ?? item.amount), valorBruto: Number(item.gross_amount ?? item.amount), descontos: Number(item.discounts ?? 0), valorLiquido: Number(item.net_amount ?? item.amount), data: String(item.date), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as Pagamento[],
     configuracaoRendaVariavel,
   };
 }
@@ -139,9 +143,12 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   const suportaRecorrenciaSaas = await colunaExiste('recurring_transactions', 'title');
   const suportaWorkSessions = await tabelaExiste('work_sessions');
   const suportaWorkSessionTipo = suportaWorkSessions && await colunaExiste('work_sessions', 'type');
+  const suportaWorkSessionPayroll = suportaWorkSessions && await colunaExiste('work_sessions', 'gross_earned');
   const suportaPayments = await tabelaExiste('payments');
   const suportaPaymentTransaction = suportaPayments && await colunaExiste('payments', 'transaction_id');
+  const suportaPaymentPayroll = suportaPayments && await colunaExiste('payments', 'gross_amount');
   const suportaUserSettings = await tabelaExiste('user_settings');
+  const suportaUserSettingsPayroll = suportaUserSettings && await colunaExiste('user_settings', 'hourly_rate');
   await Promise.all([
     supabase.from('transactions').delete().eq('user_id', userId),
     supabase.from('budgets').delete().eq('user_id', userId),
@@ -176,16 +183,26 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
     })),
     suportaWorkSessions ? inserirLinhas('work_sessions', estado.sessoesTrabalho.map((item) => {
       const base = { id: item.id, user_id: userId, date: item.data, hours_worked: item.horasTrabalhadas, hourly_rate: item.valorHora, total_earned: item.totalGanho, transaction_id: item.transacaoId ?? null };
-      return suportaWorkSessionTipo ? { ...base, type: item.tipo ?? 'normal' } : base;
+      const comTipo = suportaWorkSessionTipo ? { ...base, type: item.tipo ?? 'normal' } : base;
+      return suportaWorkSessionPayroll ? { ...comTipo, hours_extra: item.horasExtras ?? 0, worked: item.trabalhou ?? item.tipo !== 'falta', is_absent: item.falta ?? item.tipo === 'falta', discounts: item.descontos ?? 0, gross_earned: item.valorBruto ?? item.totalGanho, net_earned: item.valorLiquido ?? item.totalGanho } : comTipo;
     })) : Promise.resolve(),
     suportaPayments ? inserirLinhas('payments', estado.pagamentos.map((item) => {
       const base = { id: item.id, user_id: userId, amount: item.valor, type: item.tipo, date: item.data };
-      return suportaPaymentTransaction ? { ...base, transaction_id: item.transacaoId ?? null } : base;
+      const comTransacao = suportaPaymentTransaction ? { ...base, transaction_id: item.transacaoId ?? null } : base;
+      return suportaPaymentPayroll ? { ...comTransacao, gross_amount: item.valorBruto ?? item.valor, discounts: item.descontos ?? 0, net_amount: item.valorLiquido ?? item.valor } : comTransacao;
     })) : Promise.resolve(),
     suportaUserSettings ? inserirLinhasComConflito('user_settings', [{
       user_id: userId,
-      default_hourly_rate: estado.configuracaoRendaVariavel.valorHoraPadrao,
-      default_daily_hours: estado.configuracaoRendaVariavel.horasPadraoDia,
+      ...(suportaUserSettingsPayroll ? {
+        hourly_rate: estado.configuracaoRendaVariavel.valorHoraPadrao,
+        default_hours: estado.configuracaoRendaVariavel.horasPadraoDia,
+        discount_inss: estado.configuracaoRendaVariavel.descontoInss,
+        discount_fgts: estado.configuracaoRendaVariavel.descontoFgts,
+        other_discounts: estado.configuracaoRendaVariavel.outrosDescontos,
+      } : {
+        default_hourly_rate: estado.configuracaoRendaVariavel.valorHoraPadrao,
+        default_daily_hours: estado.configuracaoRendaVariavel.horasPadraoDia,
+      }),
       overtime_multiplier: estado.configuracaoRendaVariavel.multiplicadorHoraExtra,
     }], 'user_id') : Promise.resolve(),
   ]);
@@ -305,6 +322,9 @@ function criarEstadoVazio(usuario: AuthUser): AppState {
       valorHoraPadrao: 25,
       horasPadraoDia: 8,
       multiplicadorHoraExtra: 1.5,
+      descontoInss: 0,
+      descontoFgts: 0,
+      outrosDescontos: 0,
     },
   };
 }

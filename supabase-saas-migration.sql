@@ -37,7 +37,20 @@ create table if not exists public.work_sessions (
 );
 
 alter table public.work_sessions
-  add column if not exists type text not null default 'normal';
+  add column if not exists type text not null default 'normal',
+  add column if not exists hours_extra numeric not null default 0,
+  add column if not exists worked boolean not null default true,
+  add column if not exists is_absent boolean not null default false,
+  add column if not exists discounts numeric not null default 0,
+  add column if not exists gross_earned numeric not null default 0,
+  add column if not exists net_earned numeric not null default 0;
+
+update public.work_sessions
+set
+  gross_earned = case when gross_earned = 0 then total_earned else gross_earned end,
+  net_earned = case when net_earned = 0 then total_earned else net_earned end,
+  is_absent = case when type = 'falta' then true else is_absent end,
+  worked = case when type in ('falta', 'folga') then false else worked end;
 
 alter table public.work_sessions
   drop constraint if exists work_sessions_hours_worked_check;
@@ -58,7 +71,35 @@ alter table public.work_sessions
 
 alter table public.work_sessions
   add constraint work_sessions_type_check
-  check (type in ('normal', 'falta', 'extra'));
+  check (type in ('normal', 'falta', 'extra', 'folga'));
+
+alter table public.work_sessions
+  drop constraint if exists work_sessions_hours_extra_check;
+
+alter table public.work_sessions
+  add constraint work_sessions_hours_extra_check
+  check (hours_extra >= 0);
+
+alter table public.work_sessions
+  drop constraint if exists work_sessions_discounts_check;
+
+alter table public.work_sessions
+  add constraint work_sessions_discounts_check
+  check (discounts >= 0);
+
+alter table public.work_sessions
+  drop constraint if exists work_sessions_gross_earned_check;
+
+alter table public.work_sessions
+  add constraint work_sessions_gross_earned_check
+  check (gross_earned >= 0);
+
+alter table public.work_sessions
+  drop constraint if exists work_sessions_net_earned_check;
+
+alter table public.work_sessions
+  add constraint work_sessions_net_earned_check
+  check (net_earned >= 0);
 
 alter table public.work_sessions enable row level security;
 
@@ -96,6 +137,60 @@ create table if not exists public.user_settings (
   created_at timestamptz not null default now()
 );
 
+alter table public.user_settings
+  add column if not exists hourly_rate numeric not null default 25,
+  add column if not exists default_hours numeric not null default 8,
+  add column if not exists discount_inss numeric not null default 0,
+  add column if not exists discount_fgts numeric not null default 0,
+  add column if not exists other_discounts numeric not null default 0;
+
+update public.user_settings
+set
+  hourly_rate = coalesce(hourly_rate, default_hourly_rate, 25),
+  default_hours = coalesce(default_hours, default_daily_hours, 8);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_hourly_rate_check;
+
+alter table public.user_settings
+  add constraint user_settings_hourly_rate_check
+  check (hourly_rate >= 0);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_default_hours_check;
+
+alter table public.user_settings
+  add constraint user_settings_default_hours_check
+  check (default_hours >= 0);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_overtime_multiplier_check;
+
+alter table public.user_settings
+  add constraint user_settings_overtime_multiplier_check
+  check (overtime_multiplier >= 1);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_discount_inss_check;
+
+alter table public.user_settings
+  add constraint user_settings_discount_inss_check
+  check (discount_inss >= 0);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_discount_fgts_check;
+
+alter table public.user_settings
+  add constraint user_settings_discount_fgts_check
+  check (discount_fgts >= 0);
+
+alter table public.user_settings
+  drop constraint if exists user_settings_other_discounts_check;
+
+alter table public.user_settings
+  add constraint user_settings_other_discounts_check
+  check (other_discounts >= 0);
+
 alter table public.user_settings enable row level security;
 
 drop policy if exists "Users can view own settings" on public.user_settings;
@@ -131,7 +226,36 @@ create table if not exists public.payments (
 );
 
 alter table public.payments
-  add column if not exists transaction_id uuid null references public.transactions(id) on delete set null;
+  add column if not exists transaction_id uuid null references public.transactions(id) on delete set null,
+  add column if not exists gross_amount numeric not null default 0,
+  add column if not exists discounts numeric not null default 0,
+  add column if not exists net_amount numeric not null default 0;
+
+update public.payments
+set
+  gross_amount = case when gross_amount = 0 then amount else gross_amount end,
+  net_amount = case when net_amount = 0 then amount else net_amount end;
+
+alter table public.payments
+  drop constraint if exists payments_gross_amount_check;
+
+alter table public.payments
+  add constraint payments_gross_amount_check
+  check (gross_amount >= 0);
+
+alter table public.payments
+  drop constraint if exists payments_discounts_check;
+
+alter table public.payments
+  add constraint payments_discounts_check
+  check (discounts >= 0);
+
+alter table public.payments
+  drop constraint if exists payments_net_amount_check;
+
+alter table public.payments
+  add constraint payments_net_amount_check
+  check (net_amount >= 0);
 
 alter table public.payments enable row level security;
 
