@@ -42,13 +42,22 @@ export type TransacaoRecorrente = {
   gerarAutomatico?: boolean;
 };
 
+export type TipoSessaoTrabalho = 'normal' | 'falta' | 'extra';
+
 export type SessaoTrabalho = {
   id: string;
   data: string;
   horasTrabalhadas: number;
   valorHora: number;
   totalGanho: number;
+  tipo?: TipoSessaoTrabalho;
   transacaoId?: string;
+};
+
+export type ConfiguracaoRendaVariavel = {
+  valorHoraPadrao: number;
+  horasPadraoDia: number;
+  multiplicadorHoraExtra: number;
 };
 
 export type Orcamento = {
@@ -132,6 +141,7 @@ export type AppState = {
   metas: MetaFinanceira[];
   historicoMensal: HistoricoMensal[];
   sessoesTrabalho: SessaoTrabalho[];
+  configuracaoRendaVariavel: ConfiguracaoRendaVariavel;
 };
 
 export type Toast = {

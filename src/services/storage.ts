@@ -1,5 +1,5 @@
 import { User } from '@supabase/supabase-js';
-import { AppState, AuthUser, Categoria, Investimento, MetaFinanceira, Orcamento, SessaoTrabalho, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
+import { AppState, AuthUser, Categoria, ConfiguracaoRendaVariavel, Investimento, MetaFinanceira, Orcamento, SessaoTrabalho, Transacao, TransacaoRecorrente, Usuario } from '../types/financeiro';
 import { exigirSupabase } from './supabaseClient';
 
 type ProfileRow = {
@@ -22,7 +22,9 @@ const SELECTS = {
   goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
   recurringTransactions: 'id, user_id, title, type, category_id, description, amount, start_date, frequency, active, kind, end_date, status, next_date, execution_day, auto_generate, created_at',
   recurringTransactionsLegacy: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
-  workSessions: 'id, user_id, date, hours_worked, hourly_rate, total_earned, transaction_id, created_at',
+  workSessions: 'id, user_id, date, hours_worked, hourly_rate, total_earned, type, transaction_id, created_at',
+  workSessionsLegacy: 'id, user_id, date, hours_worked, hourly_rate, total_earned, transaction_id, created_at',
+  userSettings: 'id, user_id, default_hourly_rate, default_daily_hours, overtime_multiplier, created_at',
 } as const;
 
 function iniciais(nome: string) {
@@ -73,7 +75,7 @@ export async function garantirPerfil(user: User, nomeFallback?: string) {
 
 export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppState> {
   const supabase = exigirSupabase();
-  const [profile, categories, transactionsResult, budgets, investmentsResult, goals, recurringResult, workSessionsResult] = await Promise.all([
+  const [profile, categories, transactionsResult, budgets, investmentsResult, goals, recurringResult, workSessionsResult, userSettingsResult] = await Promise.all([
     supabase.from('profiles').select(SELECTS.profiles).eq('id', usuario.id).maybeSingle<ProfileRow>(),
     supabase.from('categories').select(SELECTS.categories).eq('user_id', usuario.id),
     selecionarComFallback('transactions', SELECTS.transactions, SELECTS.transactionsLegacy, usuario.id),
@@ -81,9 +83,10 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     selecionarComFallback('investments', SELECTS.investments, SELECTS.investmentsLegacy, usuario.id),
     supabase.from('goals').select(SELECTS.goals).eq('user_id', usuario.id),
     selecionarComFallback('recurring_transactions', SELECTS.recurringTransactions, SELECTS.recurringTransactionsLegacy, usuario.id),
-    selecionarTabelaOpcional('work_sessions', SELECTS.workSessions, usuario.id),
+    selecionarTabelaOpcionalComFallback('work_sessions', SELECTS.workSessions, SELECTS.workSessionsLegacy, usuario.id),
+    selecionarTabelaOpcional('user_settings', SELECTS.userSettings, usuario.id),
   ]);
-  const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error].find(Boolean);
+  const erro = [profile.error, categories.error, transactionsResult.error, budgets.error, investmentsResult.error, goals.error, recurringResult.error, workSessionsResult.error, userSettingsResult.error].find(Boolean);
   if (erro) throw new Error(erro.message);
 
   const perfil = profile.data ?? {
@@ -93,6 +96,12 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     avatar: usuario.avatar,
     theme: usuario.tema,
     savings_goal: 25,
+  };
+  const settings = ((userSettingsResult.data ?? []) as unknown as Record<string, unknown>[])[0];
+  const configuracaoRendaVariavel: ConfiguracaoRendaVariavel = {
+    valorHoraPadrao: Number(settings?.default_hourly_rate ?? 25),
+    horasPadraoDia: Number(settings?.default_daily_hours ?? 8),
+    multiplicadorHoraExtra: Number(settings?.overtime_multiplier ?? 1.5),
   };
 
   return {
@@ -111,7 +120,8 @@ export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppStat
     investimentos: ((investmentsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), nome: String(item.name ?? ''), tipo: item.type as Investimento['tipo'], valorInicial: Number(item.initial_amount), aporteMensal: Number(item.monthly_contribution), rentabilidadeEsperada: Number(item.expected_return), rentabilidadeAtual: Number(item.current_return), detalhes: (item.details as Investimento['detalhes']) ?? {} })) as Investimento[],
     metas: (goals.data ?? []).map((item) => ({ id: item.id, nome: item.name, valorAlvo: Number(item.target_amount), valorAtual: Number(item.current_amount), prazo: item.deadline })) as MetaFinanceira[],
     historicoMensal: [],
-    sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), valorHora: Number(item.hourly_rate), totalGanho: Number(item.total_earned), transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
+    sessoesTrabalho: ((workSessionsResult.data ?? []) as unknown as Record<string, unknown>[]).map((item) => ({ id: String(item.id), data: String(item.date), horasTrabalhadas: Number(item.hours_worked), valorHora: Number(item.hourly_rate), totalGanho: Number(item.total_earned), tipo: (item.type ?? 'normal') as SessaoTrabalho['tipo'], transacaoId: item.transaction_id ? String(item.transaction_id) : undefined })) as SessaoTrabalho[],
+    configuracaoRendaVariavel,
   };
 }
 
@@ -124,6 +134,8 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
   const suportaDiaExecucao = await colunaExiste('recurring_transactions', 'execution_day');
   const suportaRecorrenciaSaas = await colunaExiste('recurring_transactions', 'title');
   const suportaWorkSessions = await tabelaExiste('work_sessions');
+  const suportaWorkSessionTipo = suportaWorkSessions && await colunaExiste('work_sessions', 'type');
+  const suportaUserSettings = await tabelaExiste('user_settings');
   await Promise.all([
     supabase.from('transactions').delete().eq('user_id', userId),
     supabase.from('budgets').delete().eq('user_id', userId),
@@ -155,7 +167,16 @@ export async function salvarEstadoSupabase(userId: string, estado: AppState) {
       const avancado = suportaRecorrenciaAvancada ? { ...comSaas, kind: item.tipoRecorrencia ?? item.tipo, end_date: item.dataFinal ?? null, status: item.status ?? (item.ativa ? 'ativa' : 'pausada'), next_date: item.proximaData ?? item.dataInicio } : comSaas;
       return suportaDiaExecucao ? { ...avancado, execution_day: item.diaExecucao ?? null } : avancado;
     })),
-    suportaWorkSessions ? inserirLinhas('work_sessions', estado.sessoesTrabalho.map((item) => ({ id: item.id, user_id: userId, date: item.data, hours_worked: item.horasTrabalhadas, hourly_rate: item.valorHora, total_earned: item.totalGanho, transaction_id: item.transacaoId ?? null }))) : Promise.resolve(),
+    suportaWorkSessions ? inserirLinhas('work_sessions', estado.sessoesTrabalho.map((item) => {
+      const base = { id: item.id, user_id: userId, date: item.data, hours_worked: item.horasTrabalhadas, hourly_rate: item.valorHora, total_earned: item.totalGanho, transaction_id: item.transacaoId ?? null };
+      return suportaWorkSessionTipo ? { ...base, type: item.tipo ?? 'normal' } : base;
+    })) : Promise.resolve(),
+    suportaUserSettings ? inserirLinhasComConflito('user_settings', [{
+      user_id: userId,
+      default_hourly_rate: estado.configuracaoRendaVariavel.valorHoraPadrao,
+      default_daily_hours: estado.configuracaoRendaVariavel.horasPadraoDia,
+      overtime_multiplier: estado.configuracaoRendaVariavel.multiplicadorHoraExtra,
+    }], 'user_id') : Promise.resolve(),
   ]);
 }
 
@@ -188,6 +209,13 @@ async function inserirLinhas(tabela: string, linhas: Record<string, unknown>[]) 
   if (error) throw new Error(error.message);
 }
 
+async function inserirLinhasComConflito(tabela: string, linhas: Record<string, unknown>[], onConflict: string) {
+  const supabase = exigirSupabase();
+  if (linhas.length === 0) return;
+  const { error } = await supabase.from(tabela).upsert(linhas, { onConflict });
+  if (error) throw new Error(error.message);
+}
+
 function verificarErros(resultados: { error: { message: string } | null }[]) {
   const erro = resultados.find((resultado) => resultado.error)?.error;
   if (erro) throw new Error(erro.message);
@@ -205,6 +233,19 @@ async function selecionarTabelaOpcional(tabela: string, select: string, userId: 
   const resultado = await supabase.from(tabela).select(select).eq('user_id', userId);
   if (!resultado.error || /does not exist/i.test(resultado.error.message)) return { data: resultado.data ?? [], error: null };
   return resultado;
+}
+
+async function selecionarTabelaOpcionalComFallback(tabela: string, selectNovo: string, selectLegado: string, userId: string) {
+  const supabase = exigirSupabase();
+  const novo = await supabase.from(tabela).select(selectNovo).eq('user_id', userId);
+  if (!novo.error) return novo;
+  if (/does not exist/i.test(novo.error.message)) return { data: [], error: null };
+  if (/column .* does not exist/i.test(novo.error.message)) {
+    const legado = await supabase.from(tabela).select(selectLegado).eq('user_id', userId);
+    if (!legado.error || /does not exist/i.test(legado.error.message)) return { data: legado.data ?? [], error: null };
+    return legado;
+  }
+  return novo;
 }
 
 async function colunaExiste(tabela: string, coluna: string) {
@@ -248,5 +289,10 @@ function criarEstadoVazio(usuario: AuthUser): AppState {
     metas: [],
     historicoMensal: [],
     sessoesTrabalho: [],
+    configuracaoRendaVariavel: {
+      valorHoraPadrao: 25,
+      horasPadraoDia: 8,
+      multiplicadorHoraExtra: 1.5,
+    },
   };
 }

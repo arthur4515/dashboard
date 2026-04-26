@@ -399,6 +399,11 @@ function simularExecucoes(recorrente: TransacaoRecorrente) {
     metas: [],
     historicoMensal: [],
     sessoesTrabalho: [],
+    configuracaoRendaVariavel: {
+      valorHoraPadrao: 25,
+      horasPadraoDia: 8,
+      multiplicadorHoraExtra: 1.5,
+    },
   };
   return recorrenciasFuturas(estadoTemporario, 90)
     .slice(0, 8)
