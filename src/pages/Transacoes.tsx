@@ -213,7 +213,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
                   {grupo.itens.map((item) => {
                     const cat = estado.categorias.find((c) => c.id === item.categoriaId);
                     return (
-                      <article key={item.id} className="flex items-center gap-4 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30">
+                      <article key={item.id} className="flex flex-col gap-3 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30 sm:flex-row sm:items-center sm:gap-4">
                         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${item.tipo === 'receita' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'}`}>
                           {item.tipo === 'receita' ? '+' : '-'}
                         </div>
@@ -225,7 +225,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
                           </div>
                           <p className="mt-1 text-sm text-slate-500">{formatarDataCurta(item.data)} • {cat?.nome ?? 'Sem categoria'}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
                           <p className={item.tipo === 'receita' ? 'font-bold text-emerald-600' : 'font-bold text-rose-600'}>{item.tipo === 'receita' ? '+' : '-'} {formatarMoeda(item.valor)}</p>
                           <div className="mt-2 flex justify-end gap-1">
                             <button className="icon-btn" onClick={() => abrirEdicao(item)} aria-label="Editar"><Edit3 size={16} /></button>
@@ -259,7 +259,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
                   {grupo.itens.map((item) => {
                     const cat = estado.categorias.find((c) => c.id === item.recorrente.categoriaId);
                     return (
-                      <article key={`${item.recorrente.id}-${item.data}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30">
+                      <article key={`${item.recorrente.id}-${item.data}`} className="flex flex-col gap-3 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30 sm:flex-row sm:items-center sm:gap-4">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                           <CalendarClock size={19} />
                         </div>
