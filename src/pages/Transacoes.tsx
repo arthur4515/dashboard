@@ -26,7 +26,7 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
   const [categoria, setCategoria] = useState('todas');
   const [mes, setMes] = useState(mesAtualISO());
   const [busca, setBusca] = useState('');
-  const futuras = recorrenciasFuturas(estado, 90).slice(0, 12);
+  const futuras = recorrenciasFuturas(estado, 120);
 
   const categoriasDoTipo = estado.categorias.filter((item) => item.tipo === form.tipo);
   const categoriasRecorrencia = estado.categorias.filter((item) => item.tipo === recorrenteForm.tipo);
@@ -34,6 +34,15 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
     const texto = item.descricao.toLowerCase().includes(busca.toLowerCase());
     return texto && (tipo === 'todos' || item.tipo === tipo) && (categoria === 'todas' || item.categoriaId === categoria) && item.data.startsWith(mes);
   }).sort((a, b) => b.data.localeCompare(a.data)), [estado.transacoes, tipo, categoria, mes, busca]);
+  const futurasFiltradas = useMemo(() => futuras
+    .filter((item) => !estado.transacoes.some((transacao) => transacao.recorrenciaId === item.recorrente.id && transacao.data === item.data))
+    .filter((item) => item.recorrente.descricao.toLowerCase().includes(busca.toLowerCase()))
+    .filter((item) => tipo === 'todos' || item.recorrente.tipo === tipo)
+    .filter((item) => categoria === 'todas' || item.recorrente.categoriaId === categoria)
+    .filter((item) => item.data.startsWith(mes))
+    .sort((a, b) => b.data.localeCompare(a.data)), [futuras, estado.transacoes, busca, tipo, categoria, mes]);
+  const transacoesPorMes = useMemo(() => agruparTransacoesPorMes(filtradas), [filtradas]);
+  const futurasPorMes = useMemo(() => agruparFuturasPorMes(futurasFiltradas), [futurasFiltradas]);
 
   function abrirNova(tipoTransacao: TipoTransacao) {
     setEditando(null);
@@ -175,7 +184,6 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={gerarRecorrencias}>Gerar recorrentes do mes</button>
-          <button className="btn-secondary" onClick={gerarRecorrencias}>Gerar recorrentes agora</button>
           <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{estado.recorrentes.filter((item) => (item.status ?? (item.ativa ? 'ativa' : 'pausada')) === 'ativa').length} recorrencia(s) ativa(s)</span>
         </div>
       </div>
@@ -189,72 +197,126 @@ export function Transacoes({ estado, setEstado, avisar }: Props) {
         ))}
       </div>
 
-      <div className="card p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-slate-950 dark:text-white">Agendador recorrente</h2>
-          <button className="btn-secondary" onClick={gerarRecorrencias}>Gerar mes atual</button>
-        </div>
-        {estado.recorrentes.length > 0 && (
-          <div className="mb-5 grid gap-3 lg:grid-cols-2">
-            {estado.recorrentes.map((item) => {
-              const categoriaAtual = estado.categorias.find((cat) => cat.id === item.categoriaId);
-              const status = item.status ?? (item.ativa ? 'ativa' : 'inativa');
-              return (
-                <div key={item.id} className="rounded-lg border border-violet-100 p-4 dark:border-violet-950">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-950 dark:text-white">{item.descricao}</p>
-                      <p className="text-sm text-slate-500">{resumoRecorrencia(item)} - {categoriaAtual?.nome ?? 'Sem categoria'}</p>
-                      <p className="mt-1 text-sm font-semibold text-violet-700 dark:text-violet-300">Proximo: {formatarDataCurta(proximaDataRecorrencia(item))}</p>
-                    </div>
-                    <strong className={item.tipo === 'receita' ? 'text-emerald-600' : 'text-rose-600'}>{formatarMoeda(item.valor)}</strong>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="btn-secondary" onClick={() => abrirRecorrencia(item)}><Edit3 size={16} />Editar</button>
-                    <button className="btn-secondary" onClick={() => alternarRecorrencia(item)}>{status === 'ativa' ? 'Desativar' : 'Ativar'}</button>
-                    <button className="btn-secondary" onClick={() => excluirRecorrencia(item.id)}><Trash2 size={16} />Excluir</button>
-                  </div>
-                </div>
-              );
-            })}
+      <section className="card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950 dark:text-white">Lançamentos realizados</h2>
+            <p className="text-sm text-slate-500">Transações efetivadas, em ordem cronológica decrescente.</p>
           </div>
-        )}
-        {futuras.length === 0 ? <EmptyState icon={CalendarClock} titulo="Sem recorrencias futuras" texto="Cadastre uma recorrencia ativa para ver proximas cobrancas, recebimentos e aportes." /> : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {futuras.map((item) => (
-              <div key={`${item.recorrente.id}-${item.data}`} className="rounded-lg border border-violet-100 p-3 dark:border-violet-950">
-                <div className="flex items-start justify-between gap-3">
-                  <div><p className="font-semibold text-slate-950 dark:text-white">{item.recorrente.descricao}</p><p className="text-sm text-slate-500">{item.recorrente.tipoRecorrencia ?? item.recorrente.tipo} - {new Date(item.data).toLocaleDateString('pt-BR')}</p></div>
-                  <strong className={item.recorrente.tipo === 'receita' ? 'text-emerald-600' : 'text-rose-600'}>{formatarMoeda(item.recorrente.valor)}</strong>
+        </div>
+        {filtradas.length === 0 ? <div className="p-6"><EmptyState icon={Search} titulo="Nenhuma transação encontrada" texto="Adicione lançamentos, gere recorrências ou importe um CSV." /></div> : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {transacoesPorMes.map((grupo) => (
+              <div key={grupo.mes}>
+                <div className="bg-slate-50 px-5 py-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">{grupo.rotulo}</div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {grupo.itens.map((item) => {
+                    const cat = estado.categorias.find((c) => c.id === item.categoriaId);
+                    return (
+                      <article key={item.id} className="flex items-center gap-4 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${item.tipo === 'receita' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'}`}>
+                          {item.tipo === 'receita' ? '+' : '-'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-semibold text-slate-950 dark:text-white">{item.descricao}</p>
+                            {item.recorrenciaId && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-200">Recorrente</span>}
+                            {item.importada && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">CSV</span>}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-500">{formatarDataCurta(item.data)} • {cat?.nome ?? 'Sem categoria'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={item.tipo === 'receita' ? 'font-bold text-emerald-600' : 'font-bold text-rose-600'}>{item.tipo === 'receita' ? '+' : '-'} {formatarMoeda(item.valor)}</p>
+                          <div className="mt-2 flex justify-end gap-1">
+                            <button className="icon-btn" onClick={() => abrirEdicao(item)} aria-label="Editar"><Edit3 size={16} /></button>
+                            <button className="icon-btn" onClick={() => excluir(item.id)} aria-label="Excluir"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="card overflow-hidden">
-        {filtradas.length === 0 ? <div className="p-6"><EmptyState icon={Search} titulo="Nenhuma transacao encontrada" texto="Adicione lancamentos, gere recorrencias ou importe um CSV." /></div> : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400"><tr><th className="p-4">Descricao</th><th>Categoria</th><th>Data</th><th>Origem</th><th>Valor</th><th className="pr-4 text-right">Acoes</th></tr></thead>
-              <tbody>
-                {filtradas.map((item) => {
-                  const cat = estado.categorias.find((c) => c.id === item.categoriaId);
-                  return (
-                    <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="p-4 font-semibold text-slate-900 dark:text-white">{item.descricao}</td>
-                      <td>{cat?.nome ?? 'Sem categoria'}</td><td>{new Date(item.data).toLocaleDateString('pt-BR')}</td><td>{item.recorrenciaId ? 'Recorrente' : item.importada ? 'CSV' : 'Manual'}</td>
-                      <td className={item.tipo === 'receita' ? 'font-bold text-emerald-600' : 'font-bold text-rose-600'}>{formatarMoeda(item.valor)}</td>
-                      <td className="pr-4 text-right"><button className="icon-btn mr-2" onClick={() => abrirEdicao(item)} aria-label="Editar"><Edit3 size={16} /></button><button className="icon-btn" onClick={() => excluir(item.id)} aria-label="Excluir"><Trash2 size={16} /></button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <section className="card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950 dark:text-white">Lançamentos futuros</h2>
+            <p className="text-sm text-slate-500">Previsões geradas pelas recorrências ativas, sem repetir lançamentos já realizados.</p>
+          </div>
+          <button className="btn-secondary" onClick={gerarRecorrencias}>Gerar mês atual</button>
+        </div>
+        {futurasFiltradas.length === 0 ? <div className="p-6"><EmptyState icon={CalendarClock} titulo="Nenhum lançamento previsto" texto="Cadastre uma recorrência ativa para ver próximos lançamentos." /></div> : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {futurasPorMes.map((grupo) => (
+              <div key={grupo.mes}>
+                <div className="bg-slate-50 px-5 py-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">{grupo.rotulo}</div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {grupo.itens.map((item) => {
+                    const cat = estado.categorias.find((c) => c.id === item.recorrente.categoriaId);
+                    return (
+                      <article key={`${item.recorrente.id}-${item.data}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-violet-50/70 dark:hover:bg-violet-950/30">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          <CalendarClock size={19} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-semibold text-slate-950 dark:text-white">{item.recorrente.descricao}</p>
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-200">Previsto</span>
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-200">Recorrente</span>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-500">{formatarDataCurta(item.data)} • {cat?.nome ?? 'Sem categoria'}</p>
+                        </div>
+                        <p className={item.recorrente.tipo === 'receita' ? 'font-bold text-emerald-600' : 'font-bold text-rose-600'}>{item.recorrente.tipo === 'receita' ? '+' : '-'} {formatarMoeda(item.recorrente.valor)}</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-      </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950 dark:text-white">Recorrências cadastradas</h2>
+            <p className="text-sm text-slate-500">Regras mensais usadas para gerar lançamentos previstos e realizados.</p>
+          </div>
+          <button className="btn-secondary" onClick={() => abrirRecorrencia()}><CalendarClock size={18} />Nova recorrência</button>
+        </div>
+        {estado.recorrentes.length === 0 ? <EmptyState icon={CalendarClock} titulo="Nenhuma recorrência cadastrada" texto="Crie salários, contas e cobranças mensais automáticas." /> : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {estado.recorrentes.map((item) => {
+              const categoriaAtual = estado.categorias.find((cat) => cat.id === item.categoriaId);
+              const status = item.status ?? (item.ativa ? 'ativa' : 'inativa');
+              return (
+                <article key={item.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-slate-950 dark:text-white">{item.descricao}</p>
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-200">Recorrente</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${status === 'ativa' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>{status === 'ativa' ? 'Ativa' : 'Inativa'}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">{resumoRecorrencia(item)} • {categoriaAtual?.nome ?? 'Sem categoria'} • Próximo: {formatarDataCurta(proximaDataRecorrencia(item))}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong className={item.tipo === 'receita' ? 'text-emerald-600' : 'text-rose-600'}>{formatarMoeda(item.valor)}</strong>
+                    <button className="btn-secondary" onClick={() => abrirRecorrencia(item)}><Edit3 size={16} />Editar</button>
+                    <button className="btn-secondary" onClick={() => alternarRecorrencia(item)}>{status === 'ativa' ? 'Desativar' : 'Ativar'}</button>
+                    <button className="icon-btn" onClick={() => excluirRecorrencia(item.id)} aria-label="Excluir recorrência"><Trash2 size={16} /></button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <Modal aberto={modal} titulo={editando ? 'Editar transacao' : form.tipo === 'receita' ? 'Nova receita' : 'Nova despesa'} onFechar={() => setModal(false)}>
         <form className="grid gap-4 md:grid-cols-2" onSubmit={salvar}>
@@ -350,4 +412,32 @@ function descricaoPadraoRecorrencia(tipo: TipoTransacao) {
 function formatarDataCurta(data?: string) {
   if (!data) return 'sem data';
   return new Date(`${data}T00:00:00`).toLocaleDateString('pt-BR');
+}
+
+function agruparTransacoesPorMes(transacoes: Transacao[]) {
+  const grupos = new Map<string, Transacao[]>();
+  transacoes.forEach((transacao) => {
+    const chave = transacao.data.slice(0, 7);
+    grupos.set(chave, [...(grupos.get(chave) ?? []), transacao]);
+  });
+  return [...grupos.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([mes, itens]) => ({ mes, rotulo: rotuloMes(mes), itens: itens.sort((a, b) => b.data.localeCompare(a.data)) }));
+}
+
+function agruparFuturasPorMes(futuras: { recorrente: TransacaoRecorrente; data: string }[]) {
+  const grupos = new Map<string, { recorrente: TransacaoRecorrente; data: string }[]>();
+  futuras.forEach((item) => {
+    const chave = item.data.slice(0, 7);
+    grupos.set(chave, [...(grupos.get(chave) ?? []), item]);
+  });
+  return [...grupos.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([mes, itens]) => ({ mes, rotulo: rotuloMes(mes), itens: itens.sort((a, b) => b.data.localeCompare(a.data)) }));
+}
+
+function rotuloMes(mesIso: string) {
+  const [ano, mes] = mesIso.split('-').map(Number);
+  const nome = new Date(ano, mes - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return nome.charAt(0).toUpperCase() + nome.slice(1);
 }
