@@ -69,7 +69,7 @@ export function Investimentos({ estado, setEstado, avisar }: Props) {
             <ResponsiveContainer>
               <LineChart data={serie}>
                 <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Line dataKey="valor" stroke="#10b981" strokeWidth={3} dot={false} />
+                <Line dataKey="valor" stroke="#7C3AED" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

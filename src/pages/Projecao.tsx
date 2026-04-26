@@ -25,7 +25,7 @@ export function Projecao({ estado }: { estado: AppState }) {
             </div>
           ))}
         </div>
-        <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        <p className="mt-5 rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-100">
           Projecao automatica usando saldo atual de {formatarMoeda(resumo.patrimonioTotal)}, media mensal de receitas de {formatarMoeda(medias.receita)}, media de despesas de {formatarMoeda(medias.despesa)}, aportes de {formatarMoeda(aportes)} e rentabilidade media da carteira.
         </p>
       </Section>
@@ -36,7 +36,7 @@ export function Projecao({ estado }: { estado: AppState }) {
             <ResponsiveContainer>
               <AreaChart data={serie}>
                 <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Area dataKey="patrimonio" stroke="#10b981" fill="#10b98122" strokeWidth={3} />
+                <Area dataKey="patrimonio" stroke="#7C3AED" fill="#7C3AED22" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -46,7 +46,7 @@ export function Projecao({ estado }: { estado: AppState }) {
             <ResponsiveContainer>
               <BarChart data={pontos}>
                 <XAxis dataKey="periodo" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Bar dataKey="patrimonio" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="patrimonio" fill="#7C3AED" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

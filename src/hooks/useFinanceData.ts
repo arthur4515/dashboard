@@ -23,7 +23,10 @@ export function useFinanceData(usuario: AuthUser | null) {
         setEstado(dados);
         carregouInicial.current = true;
       })
-      .catch((erro) => setErroDados(erro instanceof Error ? erro.message : 'Erro ao carregar dados.'))
+      .catch((erro) => {
+        setEstado(null);
+        setErroDados(erro instanceof Error ? erro.message : 'Erro ao carregar dados.');
+      })
       .finally(() => setCarregando(false));
   }, [usuario]);
 

@@ -8,7 +8,7 @@ export function ToastHost({ toasts }: { toasts: Toast[] }) {
         const Icon = toast.tipo === 'sucesso' ? CheckCircle2 : toast.tipo === 'erro' ? AlertCircle : Info;
         return (
           <div key={toast.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-800 shadow-suave dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-            <Icon size={20} className={toast.tipo === 'erro' ? 'text-rose-500' : toast.tipo === 'info' ? 'text-sky-500' : 'text-emerald-500'} />
+            <Icon size={20} className={toast.tipo === 'erro' ? 'text-rose-500' : toast.tipo === 'info' ? 'text-violet-500' : 'text-emerald-500'} />
             {toast.mensagem}
           </div>
         );

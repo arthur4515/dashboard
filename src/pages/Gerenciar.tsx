@@ -14,7 +14,7 @@ type Props = {
   resetarExemplos: () => void;
 };
 
-const categoriaBase: Omit<Categoria, 'id'> = { nome: '', tipo: 'despesa', cor: '#10b981' };
+const categoriaBase: Omit<Categoria, 'id'> = { nome: '', tipo: 'despesa', cor: '#7C3AED' };
 const metaBase: Omit<MetaFinanceira, 'id'> = { nome: '', valorAlvo: 10000, valorAtual: 0, prazo: new Date().toISOString().slice(0, 10) };
 
 export function Gerenciar({ estado, setEstado, avisar, resetarExemplos }: Props) {

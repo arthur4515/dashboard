@@ -20,7 +20,7 @@ export function Dashboard({ estado }: { estado: AppState }) {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard titulo="Saldo atual" valor={formatarMoeda(resumo.saldoAtual)} variacao="Calculado com todas as transacoes" icon={Wallet} tom="azul" />
-        <MetricCard titulo="Receita mensal" valor={formatarMoeda(resumo.receita)} variacao="Atualiza ao adicionar receitas" icon={ArrowUpRight} />
+        <MetricCard titulo="Receita mensal" valor={formatarMoeda(resumo.receita)} variacao="Atualiza ao adicionar receitas" icon={ArrowUpRight} tom="verde" />
         <MetricCard titulo="Despesas mensais" valor={formatarMoeda(resumo.despesa)} variacao="Atualiza ao adicionar despesas" icon={ArrowDownRight} tom="vermelho" />
         <MetricCard titulo="Economia do mes" valor={formatarMoeda(resumo.economia)} variacao="Receitas menos despesas do mes" icon={PiggyBank} tom="ambar" />
         <MetricCard titulo="Patrimonio total" valor={formatarMoeda(resumo.patrimonioTotal)} variacao="Saldo, metas e investimentos" icon={Landmark} tom="azul" />
@@ -43,11 +43,11 @@ export function Dashboard({ estado }: { estado: AppState }) {
             <div className="h-80">
               <ResponsiveContainer>
                 <AreaChart data={evolucao}>
-                  <defs><linearGradient id="patrimonio" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.35} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>
+                  <defs><linearGradient id="patrimonio" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} /><stop offset="95%" stopColor="#7C3AED" stopOpacity={0} /></linearGradient></defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                  <Area dataKey="patrimonio" stroke="#10b981" fill="url(#patrimonio)" strokeWidth={3} />
-                  <Area dataKey="investimentos" stroke="#0ea5e9" fill="transparent" strokeWidth={2} />
+                  <Area dataKey="patrimonio" stroke="#7C3AED" fill="url(#patrimonio)" strokeWidth={3} />
+                  <Area dataKey="investimentos" stroke="#A78BFA" fill="transparent" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -74,7 +74,7 @@ export function Dashboard({ estado }: { estado: AppState }) {
             <ResponsiveContainer>
               <BarChart data={evolucao}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Bar dataKey="receita" fill="#10b981" radius={[6, 6, 0, 0]} /><Bar dataKey="despesa" fill="#f43f5e" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="receita" fill="#10B981" radius={[6, 6, 0, 0]} /><Bar dataKey="despesa" fill="#EF4444" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -102,7 +102,7 @@ export function Dashboard({ estado }: { estado: AppState }) {
 
 function Insight({ titulo, valor, texto }: { titulo: string; valor: string; texto: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+    <div className="rounded-lg border border-violet-100 bg-gradient-to-br from-white to-violet-50 p-4 dark:border-violet-950 dark:from-[#17102A] dark:to-[#0F0A1F]">
       <p className="text-sm font-semibold text-slate-500">{titulo}</p>
       <strong className="mt-2 block text-lg text-slate-950 dark:text-white">{valor}</strong>
       <p className="mt-1 text-sm text-slate-500">{texto}</p>

@@ -49,8 +49,8 @@ export function Simulador() {
             <ResponsiveContainer>
               <LineChart data={resultado.serie}>
                 <XAxis dataKey="mes" /><YAxis tickFormatter={(v) => `${Number(v) / 1000}k`} /><Tooltip formatter={(v) => formatarMoeda(Number(v))} />
-                <Line dataKey="saldo" stroke="#10b981" strokeWidth={3} dot={false} />
-                <Line dataKey="investido" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                <Line dataKey="saldo" stroke="#7C3AED" strokeWidth={3} dot={false} />
+                <Line dataKey="investido" stroke="#A78BFA" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -62,7 +62,7 @@ export function Simulador() {
           {cenarios.map((cenario) => (
             <div key={cenario.nome} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
               <h3 className="font-bold text-slate-950 dark:text-white">{cenario.nome}</h3>
-              <p className="mt-2 text-2xl font-bold text-emerald-600">{formatarMoeda(cenario.final)}</p>
+              <p className="mt-2 text-2xl font-bold text-violet-700 dark:text-violet-200">{formatarMoeda(cenario.final)}</p>
               <p className="mt-1 text-sm text-slate-500">Juros: {formatarMoeda(cenario.juros)}</p>
             </div>
           ))}

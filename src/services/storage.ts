@@ -12,6 +12,16 @@ type ProfileRow = {
   savings_goal: number;
 };
 
+const SELECTS = {
+  profiles: 'id, name, email, avatar, theme, savings_goal',
+  categories: 'id, user_id, name, type, color, created_at',
+  transactions: 'id, user_id, type, category_id, description, amount, date, recurrence_id, imported, created_at',
+  budgets: 'id, user_id, category_id, limit_amount, created_at',
+  investments: 'id, user_id, name, type, initial_amount, monthly_contribution, expected_return, current_return, created_at',
+  goals: 'id, user_id, name, target_amount, current_amount, deadline, created_at',
+  recurringTransactions: 'id, user_id, type, category_id, description, amount, start_date, frequency, active, created_at',
+} as const;
+
 function iniciais(nome: string) {
   return nome.split(' ').filter(Boolean).slice(0, 2).map((parte) => parte[0]?.toUpperCase()).join('') || 'U';
 }
@@ -49,11 +59,11 @@ export async function garantirPerfil(user: User, nomeFallback?: string) {
   const nome = nomeFallback || String(user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario');
   const avatar = String(user.user_metadata?.avatar || iniciais(nome));
   const email = user.email ?? '';
-  const { data: existente, error: buscaErro } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle<ProfileRow>();
+  const { data: existente, error: buscaErro } = await supabase.from('profiles').select(SELECTS.profiles).eq('id', user.id).maybeSingle<ProfileRow>();
   if (buscaErro) throw new Error(buscaErro.message);
   if (existente) return existente;
   const perfil: ProfileRow = { id: user.id, name: nome, email, avatar, theme: 'light', savings_goal: 25 };
-  const { error } = await supabase.from('profiles').insert(perfil);
+  const { error } = await supabase.from('profiles').upsert(perfil, { onConflict: 'id' });
   if (error) throw new Error(error.message);
   return perfil;
 }
@@ -61,13 +71,13 @@ export async function garantirPerfil(user: User, nomeFallback?: string) {
 export async function carregarEstadoSupabase(usuario: AuthUser): Promise<AppState> {
   const supabase = exigirSupabase();
   const [profile, categories, transactions, budgets, investments, goals, recurring] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', usuario.id).single<ProfileRow>(),
-    supabase.from('categories').select('*').eq('user_id', usuario.id),
-    supabase.from('transactions').select('*').eq('user_id', usuario.id),
-    supabase.from('budgets').select('*').eq('user_id', usuario.id),
-    supabase.from('investments').select('*').eq('user_id', usuario.id),
-    supabase.from('goals').select('*').eq('user_id', usuario.id),
-    supabase.from('recurring_transactions').select('*').eq('user_id', usuario.id),
+    supabase.from('profiles').select(SELECTS.profiles).eq('id', usuario.id).maybeSingle<ProfileRow>(),
+    supabase.from('categories').select(SELECTS.categories).eq('user_id', usuario.id),
+    supabase.from('transactions').select(SELECTS.transactions).eq('user_id', usuario.id),
+    supabase.from('budgets').select(SELECTS.budgets).eq('user_id', usuario.id),
+    supabase.from('investments').select(SELECTS.investments).eq('user_id', usuario.id),
+    supabase.from('goals').select(SELECTS.goals).eq('user_id', usuario.id),
+    supabase.from('recurring_transactions').select(SELECTS.recurringTransactions).eq('user_id', usuario.id),
   ]);
   const erro = [profile.error, categories.error, transactions.error, budgets.error, investments.error, goals.error, recurring.error].find(Boolean);
   if (erro) throw new Error(erro.message);
@@ -156,7 +166,7 @@ export async function atualizarPerfilSupabase(userId: string, perfil: Pick<Usuar
 async function inserirLinhas(tabela: string, linhas: Record<string, unknown>[]) {
   const supabase = exigirSupabase();
   if (linhas.length === 0) return;
-  const { error } = await supabase.from(tabela).insert(linhas);
+  const { error } = await supabase.from(tabela).upsert(linhas, { onConflict: 'id' });
   if (error) throw new Error(error.message);
 }
 
